@@ -3,6 +3,8 @@ use color_eyre::eyre::Result;
 use std::io::Write;
 
 mod lexer {
+    use color_eyre::{eyre::Result, Report};
+
     #[derive(Debug)]
     pub enum Token {
         OpAdd,
@@ -20,57 +22,60 @@ mod lexer {
     }
 
     impl Token {
-        fn from_str(input: &str) -> Self {
+        fn try_from_str(input: &str) -> Result<Self> {
             match input
                 .chars()
                 .next()
-                .unwrap_or_else(|| panic!("Unexpected empty token"))
+                .unwrap_or_else(|| unreachable!("Unexpected empty token"))
             {
-                '+' => Self::OpAdd,
-                '-' => Self::OpSupstract,
-                '*' => Self::OpMultiply,
-                '/' => Self::OpDivide,
+                '+' => Ok(Self::OpAdd),
+                '-' => Ok(Self::OpSupstract),
+                '*' => Ok(Self::OpMultiply),
+                '/' => Ok(Self::OpDivide),
 
-                '(' => Self::OpenParen,
-                ')' => Self::CloseParen,
+                '(' => Ok(Self::OpenParen),
+                ')' => Ok(Self::CloseParen),
 
                 '0'..='9' => {
                     let mut res = 0u32;
                     for c in input.chars() {
                         if c.is_ascii_digit() {
-                            res = res * 10 + c.to_digit(10).unwrap();
+                            res = res * 10 + c.to_digit(10).unwrap_or_else(|| unreachable!());
                         } else {
-                            panic!("Could not parse character {c}");
+                            return Err(Report::msg(format!(
+                                "Could not parse character '{c}'\n{}",
+                                "If you wanted to use suffixes, they are not supported yet"
+                            )));
                         }
                     }
-                    Self::Number(res)
+                    Ok(Self::Number(res))
                 },
 
                 'A'..='Z' | 'a'..='z' | '_' => {
                     let mut res = String::new();
                     for c in input.chars() {
-                        if c.is_ascii_alphabetic() || c == '_' {
+                        if c.is_ascii_alphanumeric() || c == '_' {
                             res.push(c);
                         } else {
-                            panic!("Could not parse character {c}");
+                            return Err(Report::msg(format!("Could not parse charater '{c}'")));
                         }
                     }
-                    Self::Identifier(res)
+                    Ok(Self::Identifier(res))
                 },
 
-                c => panic!("Unexpected character {c}"),
+                first => return Err(Report::msg(format!("Unexpected character {first}"))),
             }
         }
     }
 
-    pub fn parse_from(code: String) -> Vec<Token> {
+    pub fn try_parse_from(code: String) -> Result<Vec<Token>> {
         let mut res = vec![];
         let mut iter = code.chars().peekable();
 
         while let Some(first) = iter.next() {
             match first {
                 '+' | '-' | '*' | '/' | '(' | ')' => {
-                    res.push(Token::from_str(first.to_string().as_str()))
+                    res.push(Token::try_from_str(first.to_string().as_str())?)
                 },
 
                 _ if first.is_ascii_alphanumeric() || first == '_' => {
@@ -82,16 +87,16 @@ mod lexer {
                             break;
                         }
                     }
-                    res.push(Token::from_str(token.as_str()));
+                    res.push(Token::try_from_str(token.as_str())?);
                 },
 
                 _ if first.is_whitespace() => {},
-                _ => panic!("Could not parse charater '{first}'"),
+                _ => return Err(Report::msg("Could not parse charater '{first}'")),
             }
         }
 
         res.push(Token::EndOfFile);
-        res
+        Ok(res)
     }
 }
 
@@ -114,7 +119,13 @@ fn main() -> Result<()> {
             break;
         }
 
-        let tokens = lexer::parse_from(input);
+        let tokens = match lexer::try_parse_from(input) {
+            Ok(tokens) => tokens,
+            Err(e) => {
+                eprintln!("{e:?}");
+                continue;
+            }
+        };
         dbg!(tokens);
     }
 
