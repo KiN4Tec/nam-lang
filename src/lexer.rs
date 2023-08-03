@@ -1,6 +1,6 @@
 use color_eyre::{eyre::Result, Report};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Token {
     OpAdd,
     OpSupstract,
