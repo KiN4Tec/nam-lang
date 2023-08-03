@@ -51,6 +51,7 @@ impl<'a> Repl<'a> {
 
     fn _on_exit(&mut self) -> Result<()>
     {
+        (self.on_exit)()?;
         std::io::Write::flush(&mut std::io::stdout())?;
         Ok(())
     }
