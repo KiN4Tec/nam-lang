@@ -4,7 +4,9 @@ pub struct Repl<'a> {
     on_init: &'a dyn Fn() -> Result<()>,
     on_update: &'a dyn Fn(&mut Self, String) -> Result<()>,
     on_exit: &'a dyn Fn() -> Result<()>,
+
     pub is_running: bool,
+    pub crash_on_error: bool,
 }
 
 impl<'a> Repl<'a> {
@@ -12,12 +14,16 @@ impl<'a> Repl<'a> {
         on_init: &'a impl Fn() -> Result<()>,
         on_update: &'a impl Fn(&mut Self, String) -> Result<()>,
         on_exit: &'a impl Fn() -> Result<()>,
+
+        crash_on_error: bool,
     ) -> Self {
         Repl {
             on_init,
             on_update,
             on_exit,
+
             is_running: false,
+            crash_on_error,
         }
     }
 
@@ -45,12 +51,20 @@ impl<'a> Repl<'a> {
         let mut input = String::new();
         std::io::stdin().read_line(&mut input)?;
 
-        (self.on_update)(self, input)?;
-        Ok(())
+        match (self.on_update)(self, input) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                if self.crash_on_error == true {
+                    Err(e)
+                } else {
+                    eprintln!("{e:?}");
+                    Ok(())
+                }
+            },
+        }
     }
 
-    fn _on_exit(&mut self) -> Result<()>
-    {
+    fn _on_exit(&mut self) -> Result<()> {
         (self.on_exit)()?;
         std::io::Write::flush(&mut std::io::stdout())?;
         Ok(())

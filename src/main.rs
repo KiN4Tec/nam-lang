@@ -14,15 +14,9 @@ enum ASTNode {
         op: Token,
         rhs: Box<ASTNode>,
     },
-
-    None, // ! Remove this
 }
 
 impl ASTNode {
-    fn new() -> Self {
-        Self::None
-    }
-
     fn try_from(mut tokens: Vec<Token>) -> Result<Self> {
         Ok(Self::parse_program(&mut tokens))
     }
@@ -100,21 +94,10 @@ fn on_update(repl: &mut repl::Repl, input: String) -> Result<()> {
         return Ok(());
     }
 
-    let tokens = match lexer::try_parse_from(input) {
-        Ok(tokens) => tokens,
-        Err(e) => {
-            eprintln!("{e:?}");
-            vec![]
-        },
-    };
+    let tokens = lexer::try_parse_from(input)?;
+    let ast = ASTNode::try_from(tokens)?;
 
-    let _ast = match ASTNode::try_from(tokens) {
-        Ok(ast) => dbg!(ast),
-        Err(e) => {
-            eprintln!("{e:?}");
-            ASTNode::new()
-        },
-    };
+    dbg!(ast);
 
     Ok(())
 }
@@ -126,7 +109,7 @@ fn on_exit() -> Result<()> {
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let mut my_repl = repl::Repl::new(&on_init, &on_update, &on_exit);
+    let mut my_repl = repl::Repl::new(&on_init, &on_update, &on_exit, false);
     my_repl.run()?;
 
     Ok(())

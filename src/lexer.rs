@@ -40,8 +40,7 @@ impl Token {
                         match res.cmp(&max) {
                             // Normal flow
                             std::cmp::Ordering::Less => {
-                                res =
-                                    res * 10 + c.to_digit(10).unwrap_or_else(|| unreachable!())
+                                res = res * 10 + c.to_digit(10).unwrap_or_else(|| unreachable!())
                             },
 
                             // On the edge of overflow
