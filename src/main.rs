@@ -9,7 +9,7 @@ enum ASTNode {
     Variable(String),
     RuntimeVal(u32),
 
-    BinaryOp {
+    BinaryExpr {
         lhs: Box<ASTNode>,
         op: Token,
         rhs: Box<ASTNode>,
@@ -42,7 +42,7 @@ impl ASTNode {
 
             let rhs = Self::parse_multiplicative_expr(tokens)?;
 
-            lhs = Self::BinaryOp {
+            lhs = Self::BinaryExpr {
                 lhs: Box::new(lhs),
                 op,
                 rhs: Box::new(rhs),
@@ -61,7 +61,7 @@ impl ASTNode {
 
             let rhs = Self::parse_primary_expr(tokens)?;
 
-            lhs = Self::BinaryOp {
+            lhs = Self::BinaryExpr {
                 lhs: Box::new(lhs),
                 op,
                 rhs: Box::new(rhs),
