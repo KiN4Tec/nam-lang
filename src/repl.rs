@@ -54,7 +54,7 @@ impl<'a> Repl<'a> {
         match (self.on_update)(self, input) {
             Ok(_) => Ok(()),
             Err(e) => {
-                if self.crash_on_error == true {
+                if self.crash_on_error {
                     Err(e)
                 } else {
                     eprintln!("{e:?}");
