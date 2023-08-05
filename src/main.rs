@@ -1,4 +1,6 @@
+mod utils;
 mod repl;
+
 mod lexer;
 mod ast;
 

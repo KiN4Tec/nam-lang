@@ -1,5 +1,6 @@
 use color_eyre::eyre::Result;
 use crate::lexer::Token;
+use crate::utils::pop_front;
 
 #[derive(Debug)]
 pub enum ASTNode {
@@ -34,9 +35,7 @@ impl ASTNode {
         let mut lhs = Self::parse_multiplicative_expr(tokens)?;
 
         while tokens[0] == Token::OpAdd || tokens[0] == Token::OpSupstract {
-            tokens.rotate_left(1);
-            let op = tokens.pop().unwrap_or_else(|| unreachable!());
-
+            let op = pop_front(tokens).unwrap_or_else(|| unreachable!());
             let rhs = Self::parse_multiplicative_expr(tokens)?;
 
             lhs = Self::BinaryExpr {
@@ -53,9 +52,7 @@ impl ASTNode {
         let mut lhs = Self::parse_primary_expr(tokens)?;
 
         while tokens[0] == Token::OpMultiply || tokens[0] == Token::OpDivide {
-            tokens.rotate_left(1);
-            let op = tokens.pop().unwrap_or_else(|| unreachable!());
-
+            let op = pop_front(tokens).unwrap_or_else(|| unreachable!());
             let rhs = Self::parse_primary_expr(tokens)?;
 
             lhs = Self::BinaryExpr {
@@ -69,8 +66,7 @@ impl ASTNode {
     }
 
     fn parse_primary_expr(tokens: &mut Vec<Token>) -> Result<Self> {
-        tokens.rotate_left(1);
-        let token = match tokens.pop() {
+        let token = match pop_front(tokens) {
             Some(token) => token,
             None => {
                 return Err(color_eyre::Report::msg(format!(
