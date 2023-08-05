@@ -115,6 +115,7 @@ pub fn try_tokenize(code: String) -> Result<Vec<Token>> {
     Ok(res)
 }
 
+#[allow(dead_code)]
 pub fn tokenize(code: String) -> Vec<Token> {
     match try_tokenize(code) {
         Ok(tokens) => tokens,
