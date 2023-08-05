@@ -84,7 +84,7 @@ impl Token {
     }
 }
 
-pub fn try_parse_from(code: String) -> Result<Vec<Token>> {
+pub fn try_tokenize(code: String) -> Result<Vec<Token>> {
     let mut res = vec![];
     let mut iter = code.chars().peekable();
 
@@ -107,10 +107,17 @@ pub fn try_parse_from(code: String) -> Result<Vec<Token>> {
             },
 
             _ if first.is_whitespace() => {},
-            _ => return Err(Report::msg("Could not parse charater '{first}'")),
+            _ => return Err(Report::msg(format!("Could not parse charater '{first}'"))),
         }
     }
 
     res.push(Token::EndOfFile);
     Ok(res)
+}
+
+pub fn tokenize(code: String) -> Vec<Token> {
+    match try_tokenize(code) {
+        Ok(tokens) => tokens,
+        Err(e) => panic!("{e:?}"),
+    }
 }

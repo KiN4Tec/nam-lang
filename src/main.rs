@@ -18,29 +18,29 @@ enum ASTNode {
 
 impl ASTNode {
     fn try_from(mut tokens: Vec<Token>) -> Result<Self> {
-        Ok(Self::parse_program(&mut tokens))
+        Self::parse_program(&mut tokens)
     }
 
-    fn parse_program(tokens: &mut Vec<Token>) -> Self {
+    fn parse_program(tokens: &mut Vec<Token>) -> Result<Self> {
         Self::parse_stmt(tokens)
     }
 
-    fn parse_stmt(tokens: &mut Vec<Token>) -> Self {
+    fn parse_stmt(tokens: &mut Vec<Token>) -> Result<Self> {
         Self::parse_expr(tokens)
     }
 
-    fn parse_expr(tokens: &mut Vec<Token>) -> Self {
+    fn parse_expr(tokens: &mut Vec<Token>) -> Result<Self> {
         Self::parse_additive_expr(tokens)
     }
 
-    fn parse_additive_expr(tokens: &mut Vec<Token>) -> Self {
-        let mut lhs = Self::parse_multiplicative_expr(tokens);
+    fn parse_additive_expr(tokens: &mut Vec<Token>) -> Result<Self> {
+        let mut lhs = Self::parse_multiplicative_expr(tokens)?;
 
         while tokens[0] == Token::OpAdd || tokens[0] == Token::OpSupstract {
             tokens.rotate_left(1);
-            let op = tokens.pop().unwrap();
+            let op = tokens.pop().unwrap_or_else(|| unreachable!());
 
-            let rhs = Self::parse_multiplicative_expr(tokens);
+            let rhs = Self::parse_multiplicative_expr(tokens)?;
 
             lhs = Self::BinaryOp {
                 lhs: Box::new(lhs),
@@ -49,17 +49,17 @@ impl ASTNode {
             };
         }
 
-        lhs
+        Ok(lhs)
     }
 
-    fn parse_multiplicative_expr(tokens: &mut Vec<Token>) -> Self {
-        let mut lhs = Self::parse_primary_expr(tokens);
+    fn parse_multiplicative_expr(tokens: &mut Vec<Token>) -> Result<Self> {
+        let mut lhs = Self::parse_primary_expr(tokens)?;
 
         while tokens[0] == Token::OpMultiply || tokens[0] == Token::OpDivide {
             tokens.rotate_left(1);
-            let op = tokens.pop().unwrap();
+            let op = tokens.pop().unwrap_or_else(|| unreachable!());
 
-            let rhs = Self::parse_primary_expr(tokens);
+            let rhs = Self::parse_primary_expr(tokens)?;
 
             lhs = Self::BinaryOp {
                 lhs: Box::new(lhs),
@@ -68,16 +68,25 @@ impl ASTNode {
             };
         }
 
-        lhs
+        Ok(lhs)
     }
 
-    fn parse_primary_expr(tokens: &mut Vec<Token>) -> Self {
+    fn parse_primary_expr(tokens: &mut Vec<Token>) -> Result<Self> {
         tokens.rotate_left(1);
-        match tokens.pop().unwrap() {
-            Token::Identifier(var_name) => Self::Variable(var_name),
-            Token::Number(n) => Self::RuntimeVal(n),
+        let token = match tokens.pop() {
+            Some(token) => token,
+            None => {
+                return Err(color_eyre::Report::msg(format!(
+                    "Unexpected end of vector {tokens:?}"
+                )));
+            },
+        };
 
-            _ => panic!(),
+        match token {
+            Token::Identifier(var_name) => Ok(Self::Variable(var_name)),
+            Token::Number(n) => Ok(Self::RuntimeVal(n)),
+
+            _ => todo!(),
         }
     }
 }
@@ -94,7 +103,7 @@ fn on_update(repl: &mut repl::Repl, input: String) -> Result<()> {
         return Ok(());
     }
 
-    let tokens = lexer::try_parse_from(input)?;
+    let tokens = lexer::try_tokenize(input)?;
     let ast = ASTNode::try_from(tokens)?;
 
     dbg!(ast);
