@@ -10,7 +10,7 @@ pub enum Token {
     OpenParen,
     CloseParen,
 
-    Number(u32),
+    NumericLiteral(f64),
     Identifier(String),
 
     EndOfFile,
@@ -31,52 +31,15 @@ impl Token {
             '(' => Ok(Self::OpenParen),
             ')' => Ok(Self::CloseParen),
 
-            '0'..='9' => {
-                let mut res = 0u32;
-                for c in input.chars() {
-                    if c.is_ascii_digit() {
-                        let max = u32::MAX / 10;
-
-                        match res.cmp(&max) {
-                            // Normal flow
-                            std::cmp::Ordering::Less => {
-                                res = res * 10 + c.to_digit(10).unwrap_or_else(|| unreachable!())
-                            },
-
-                            // On the edge of overflow
-                            std::cmp::Ordering::Equal => {
-                                let d = c.to_digit(10).unwrap_or_else(|| unreachable!());
-                                if d > u32::MAX % 10 {
-                                    return Err(Report::msg("Integer overflow"));
-                                }
-                                res = res * 10 + d;
-                            },
-
-                            // Overflow
-                            std::cmp::Ordering::Greater => {
-                                return Err(Report::msg("Integer overflow"))
-                            },
-                        }
-                    } else {
-                        return Err(Report::msg(format!(
-                            "Could not parse character '{c}' \n{}",
-                            "If you wanted to use suffixes, they are not supported yet"
-                        )));
-                    }
-                }
-                Ok(Self::Number(res))
-            },
+            '0'..='9' => Ok(Self::NumericLiteral(input.parse()?)),
 
             'A'..='Z' | 'a'..='z' | '_' => {
-                let mut res = String::new();
                 for c in input.chars() {
-                    if c.is_ascii_alphanumeric() || c == '_' {
-                        res.push(c);
-                    } else {
+                    if !(c.is_ascii_alphanumeric() || c == '_') {
                         return Err(Report::msg(format!("Could not parse charater '{c}'")));
                     }
                 }
-                Ok(Self::Identifier(res))
+                Ok(Self::Identifier(input.to_string()))
             },
 
             first => Err(Report::msg(format!("Unexpected character {first}"))),
@@ -86,27 +49,61 @@ impl Token {
 
 pub fn try_tokenize(code: String) -> Result<Vec<Token>> {
     let mut res = vec![];
-    let mut iter = code.chars().peekable();
+    let mut idx = 0;
 
-    while let Some(first) = iter.next() {
+    while let Some(first) = code.chars().nth(idx) {
         match first {
             '+' | '-' | '*' | '/' | '(' | ')' => {
-                res.push(Token::try_from_str(first.to_string().as_str())?)
+                res.push(Token::try_from_str(first.to_string().as_str())?);
+                idx += 1;
             },
 
-            _ if first.is_ascii_alphanumeric() || first == '_' => {
-                let mut token = first.to_string();
-                while let Some(c) = iter.peek() {
-                    if c.is_ascii_alphanumeric() || *c == '_' {
-                        token.push(iter.next().unwrap_or_else(|| unreachable!()));
+            _ if first.is_ascii_digit() => {
+                let mut token = String::new();
+                let mut is_frac = false;
+                while let Some(next) = code.chars().nth(idx) {
+                    if next.is_ascii_digit() {
+                        token.push(next);
+                        idx += 1;
+                    } else if next == '.' {
+                        if is_frac {
+                            return Err(Report::msg(format!(
+                                "at {}: Could not parse a numeric literal with more than one dot.",
+                                idx + 1
+                            )));
+                        }
+                        is_frac = true;
+                        token.push('.');
+                        idx += 1;
+                    } else if next.is_ascii_alphabetic() {
+                        return Err(Report::msg(format!(
+                            "at {}: Suffixes are not supported yet",
+                            idx + 1
+                        )));
                     } else {
                         break;
                     }
                 }
+                res.push(Token::NumericLiteral(token.parse()?));
+            },
+
+            _ if first.is_ascii_alphabetic() || first == '_' => {
+                let mut token = String::new();
+                while let Some(next) = code.chars().nth(idx) {
+                    if next.is_ascii_alphanumeric() || next == '_' {
+                        token.push(next);
+                    } else {
+                        break;
+                    }
+                    idx += 1;
+                }
                 res.push(Token::try_from_str(token.as_str())?);
             },
 
-            _ if first.is_whitespace() => {},
+            _ if first.is_whitespace() => {
+                idx += 1;
+            },
+
             _ => return Err(Report::msg(format!("Could not parse charater '{first}'"))),
         }
     }

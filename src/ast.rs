@@ -5,7 +5,7 @@ use crate::utils::pop_front;
 #[derive(Debug)]
 pub enum ASTNode {
     Variable(String),
-    RuntimeVal(u32),
+    Number(f64),
 
     BinaryExpr {
         lhs: Box<ASTNode>,
@@ -77,7 +77,7 @@ impl ASTNode {
 
         match token {
             Token::Identifier(var_name) => Ok(Self::Variable(var_name)),
-            Token::Number(n) => Ok(Self::RuntimeVal(n)),
+            Token::NumericLiteral(n) => Ok(Self::Number(n)),
 
             _ => todo!(),
         }
