@@ -36,7 +36,7 @@ impl Token {
 
             'A'..='Z' | 'a'..='z' | '_' => {
                 for c in input.chars() {
-                    if !(c.is_ascii_alphanumeric() || c == '_') {
+                    if !c.is_ascii_alphanumeric() && c != '_' {
                         return Err(Report::msg(format!(
                             "Unexpected character {c} in token {input}"
                         )));
@@ -62,7 +62,7 @@ pub fn try_tokenize(code: String) -> Result<Vec<Token>> {
                 res.push(Token::try_from_str(first.to_string())?);
             },
 
-            _ if first.is_ascii_digit() => {
+            '0'..='9' => {
                 let mut token = String::from(first);
                 let mut is_frac = false;
 
@@ -89,6 +89,7 @@ pub fn try_tokenize(code: String) -> Result<Vec<Token>> {
                                 idx + 1
                             )));
                         },
+
                         _ => break,
                     }
                     chars.next();
@@ -96,15 +97,14 @@ pub fn try_tokenize(code: String) -> Result<Vec<Token>> {
                 res.push(Token::NumericLiteral(token.parse()?));
             },
 
-            _ if first.is_ascii_alphabetic() || first == '_' => {
+            'A'..='Z' | 'a'..='z' | '_' => {
                 let mut token = String::from(first);
                 while let Some(&(_idx, next)) = chars.peek() {
-                    if next.is_ascii_alphanumeric() || next == '_' {
-                        token.push(next);
-                        chars.next();
-                    } else {
+                    if !next.is_ascii_alphanumeric() && next != '_' {
                         break;
                     }
+                    token.push(next);
+                    chars.next();
                 }
                 res.push(Token::try_from_str(token)?);
             },
