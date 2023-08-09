@@ -34,8 +34,6 @@ fn on_exit() -> Result<()> {
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let mut my_repl = repl::Repl::new(&on_init, &on_update, &on_exit, false);
-    my_repl.run()?;
-
-    Ok(())
+    let mut my_repl = repl::Repl::new(on_init, on_update, on_exit, false);
+    my_repl.run()
 }

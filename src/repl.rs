@@ -1,19 +1,19 @@
 use color_eyre::eyre::Result;
 
-pub struct Repl<'a> {
-    on_init: &'a dyn Fn() -> Result<()>,
-    on_update: &'a dyn Fn(&mut Self, String) -> Result<()>,
-    on_exit: &'a dyn Fn() -> Result<()>,
+pub struct Repl {
+    on_init: fn() -> Result<()>,
+    on_update: fn(&mut Self, String) -> Result<()>,
+    on_exit: fn() -> Result<()>,
 
     pub is_running: bool,
     pub crash_on_error: bool,
 }
 
-impl<'a> Repl<'a> {
+impl Repl {
     pub fn new(
-        on_init: &'a impl Fn() -> Result<()>,
-        on_update: &'a impl Fn(&mut Self, String) -> Result<()>,
-        on_exit: &'a impl Fn() -> Result<()>,
+        on_init: fn() -> Result<()>,
+        on_update: fn(&mut Self, String) -> Result<()>,
+        on_exit: fn() -> Result<()>,
 
         crash_on_error: bool,
     ) -> Self {
