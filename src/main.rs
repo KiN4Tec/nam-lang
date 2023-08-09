@@ -14,7 +14,6 @@ fn on_init() -> Result<()> {
 
 fn on_update(repl: &mut repl::Repl, input: String) -> Result<()> {
     if input.trim() == "exit" {
-        println!("Goodbye!");
         repl.is_running = false;
         return Ok(());
     }
@@ -28,6 +27,7 @@ fn on_update(repl: &mut repl::Repl, input: String) -> Result<()> {
 }
 
 fn on_exit() -> Result<()> {
+    println!("Goodbye!");
     Ok(())
 }
 
