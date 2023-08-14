@@ -22,16 +22,16 @@ fn evaluate(ast: ASTNode) -> f64 {
                 Token::OpMultiply => res_lhs * res_rhs,
                 Token::OpDivide => res_lhs / res_rhs,
 
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         },
 
-        _ => todo!()
+        _ => todo!(),
     }
 }
 
 fn on_init() -> Result<()> {
-    println!("\nConVector v0.0");
+    println!("\nConVector v0.1");
     Ok(())
 }
 
