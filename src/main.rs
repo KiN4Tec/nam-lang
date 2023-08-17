@@ -31,7 +31,7 @@ fn evaluate(ast: ASTNode) -> f64 {
 }
 
 fn on_init() -> Result<()> {
-    println!("\nConVector v0.1");
+    println!("\nNamLang v0.1");
     Ok(())
 }
 
