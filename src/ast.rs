@@ -51,16 +51,8 @@ impl ASTNode {
     fn parse_multiplicative_expr(tokens: &mut Vec<Token>) -> Result<Self> {
         let mut lhs = Self::parse_parenthesised_expr(tokens)?;
 
-        while tokens[0] == Token::OpMultiply
-            || tokens[0] == Token::OpDivide
-            || tokens[0] == Token::OpenParen
-        {
-            let op: Token = if tokens[0] == Token::OpenParen {
-                Token::OpMultiply
-            } else {
-                pop_front(tokens).unwrap_or_else(|| unreachable!())
-            };
-
+        while tokens[0] == Token::OpMultiply || tokens[0] == Token::OpDivide {
+            let op = pop_front(tokens).unwrap_or_else(|| unreachable!());
             let rhs = Self::parse_parenthesised_expr(tokens)?;
 
             lhs = Self::BinaryExpr {
