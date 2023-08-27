@@ -1,6 +1,6 @@
 use color_eyre::eyre::Result;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     OpAdd,
     OpSupstract,
@@ -206,6 +206,6 @@ impl std::fmt::Display for TokenizationError {
             err_message = format!("{err_message}\n{message}");
         }
 
-        write!(f, "{}", err_message)
+        write!(f, "{err_message}")
     }
 }

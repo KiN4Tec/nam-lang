@@ -1,4 +1,3 @@
-mod utils;
 mod repl;
 
 mod lexer;
@@ -42,7 +41,7 @@ fn on_update(repl: &mut repl::Repl, input: String) -> Result<()> {
     }
 
     let tokens = lexer::try_tokenize(input)?;
-    let ast = ASTNode::try_from(tokens)?;
+    let ast = ASTNode::try_from(&tokens)?;
     let result = evaluate(ast);
 
     println!("ans = {result}");
