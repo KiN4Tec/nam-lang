@@ -6,10 +6,12 @@ pub enum ASTNode {
     Variable(String),
     Number(f64),
 
+    Assignment(String, Box<Self>),
+
     BinaryExpr {
-        lhs: Box<ASTNode>,
+        lhs: Box<Self>,
         op: Token,
-        rhs: Box<ASTNode>,
+        rhs: Box<Self>,
     },
 }
 
@@ -24,6 +26,21 @@ impl ASTNode {
     }
 
     fn parse_stmt(idx: usize, tokens: &[Token]) -> Result<(usize, Self)> {
+        if let Some(var_token) = tokens.get(idx) {
+            if let Some(equals_token) = tokens.get(idx + 1) {
+                if let Token::Identifier(var_name) = var_token {
+                    if Token::OpAssign == *equals_token {
+                        // x = (expession)
+                        let (consumed_len, var_value) = Self::parse_expr(idx + 2, tokens)?;
+                        return Ok((
+                            consumed_len + 2,
+                            Self::Assignment(var_name.clone(), Box::new(var_value)),
+                        ));
+                    }
+                }
+            }
+        }
+
         Self::parse_expr(idx, tokens)
     }
 
@@ -35,7 +52,7 @@ impl ASTNode {
         let (mut consumed_len, mut lhs) = Self::parse_multiplicative_expr(idx, tokens)?;
 
         while let Some(token) = tokens.get(idx + consumed_len) {
-            if *token != Token::OpAdd && *token != Token::OpSupstract {
+            if *token != Token::OpAdd && *token != Token::OpSuptract {
                 break;
             }
 
@@ -121,7 +138,9 @@ impl ASTNode {
             Token::Identifier(var_name) => Ok((1, Self::Variable(var_name.clone()))),
             Token::NumericLiteral(n) => Ok((1, Self::Number(*n))),
 
-            _ => todo!(),
+            token => Err(color_eyre::Report::msg(format!(
+                "Expected an expession but found {token:?}"
+            ))),
         }
     }
 }

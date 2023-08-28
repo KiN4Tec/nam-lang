@@ -1,35 +1,13 @@
 mod repl;
+mod state;
 
 mod lexer;
 mod ast;
+mod eval;
 
 use color_eyre::eyre::Result;
-use ast::ASTNode;
 
-fn evaluate(ast: ASTNode) -> f64 {
-    match ast {
-        ASTNode::Number(n) => n,
-
-        ASTNode::BinaryExpr { lhs, op, rhs } => {
-            let res_lhs: f64 = evaluate(*lhs);
-            let res_rhs: f64 = evaluate(*rhs);
-
-            use lexer::Token;
-            match op {
-                Token::OpAdd => res_lhs + res_rhs,
-                Token::OpSupstract => res_lhs - res_rhs,
-                Token::OpMultiply => res_lhs * res_rhs,
-                Token::OpDivide => res_lhs / res_rhs,
-
-                _ => unimplemented!(),
-            }
-        },
-
-        _ => todo!(),
-    }
-}
-
-fn on_init() -> Result<()> {
+fn on_init(_repl: &mut repl::Repl) -> Result<()> {
     println!("\nNamLang v0.1");
     Ok(())
 }
@@ -41,8 +19,8 @@ fn on_update(repl: &mut repl::Repl, input: String) -> Result<()> {
     }
 
     let tokens = lexer::try_tokenize(input)?;
-    let ast = ASTNode::try_from(&tokens)?;
-    let result = evaluate(ast);
+    let ast = ast::ASTNode::try_from(&tokens)?;
+    let result = eval::evaluate(ast, &mut repl.state)?;
 
     println!("ans = {result}");
 
@@ -57,6 +35,6 @@ fn on_exit() -> Result<()> {
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let mut my_repl = repl::Repl::new(on_init, on_update, on_exit, false);
+    let mut my_repl = repl::Repl::new(on_init, on_update, on_exit, false, None);
     my_repl.run()
 }

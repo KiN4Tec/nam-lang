@@ -3,9 +3,10 @@ use color_eyre::eyre::Result;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     OpAdd,
-    OpSupstract,
+    OpSuptract,
     OpMultiply,
     OpDivide,
+    OpAssign,
 
     OpenParen,
     CloseParen,
@@ -33,9 +34,10 @@ impl TryFrom<String> for Token {
 
         match first {
             '+' => Ok(Self::OpAdd),
-            '-' => Ok(Self::OpSupstract),
+            '-' => Ok(Self::OpSuptract),
             '*' => Ok(Self::OpMultiply),
             '/' => Ok(Self::OpDivide),
+            '=' => Ok(Self::OpAssign),
 
             '(' => Ok(Self::OpenParen),
             ')' => Ok(Self::CloseParen),
@@ -85,7 +87,7 @@ pub fn try_tokenize(code: String) -> Result<Vec<Token>, TokenizationError> {
 
     while let Some((_idx, first)) = chars.next() {
         match first {
-            '+' | '-' | '*' | '/' | '(' | ')' => {
+            '+' | '-' | '*' | '/' | '(' | ')' | '=' => {
                 res.push(Token::try_from(first.to_string())?);
             },
 
