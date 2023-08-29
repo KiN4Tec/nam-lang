@@ -16,16 +16,16 @@ pub enum ASTNode {
 }
 
 impl ASTNode {
-    pub fn try_from(tokens: &[Token]) -> Result<Self> {
+    pub fn try_from(tokens: &[Token]) -> Result<Self, ParsingError> {
         let (_, res) = Self::parse_program(0, tokens)?;
         Ok(res)
     }
 
-    fn parse_program(idx: usize, tokens: &[Token]) -> Result<(usize, Self)> {
+    fn parse_program(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
         Self::parse_stmt(idx, tokens)
     }
 
-    fn parse_stmt(idx: usize, tokens: &[Token]) -> Result<(usize, Self)> {
+    fn parse_stmt(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
         if let Some(var_token) = tokens.get(idx) {
             if let Some(equals_token) = tokens.get(idx + 1) {
                 if let Token::Identifier(var_name) = var_token {
@@ -44,11 +44,11 @@ impl ASTNode {
         Self::parse_expr(idx, tokens)
     }
 
-    fn parse_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self)> {
+    fn parse_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
         Self::parse_additive_expr(idx, tokens)
     }
 
-    fn parse_additive_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self)> {
+    fn parse_additive_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
         let (mut consumed_len, mut lhs) = Self::parse_multiplicative_expr(idx, tokens)?;
 
         while let Some(token) = tokens.get(idx + consumed_len) {
@@ -72,7 +72,10 @@ impl ASTNode {
         Ok((consumed_len, lhs))
     }
 
-    fn parse_multiplicative_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self)> {
+    fn parse_multiplicative_expr(
+        idx: usize,
+        tokens: &[Token],
+    ) -> Result<(usize, Self), ParsingError> {
         let (mut consumed_len, mut lhs) = Self::parse_parenthesised_expr(idx, tokens)?;
 
         while let Some(token) = tokens.get(idx + consumed_len) {
@@ -96,15 +99,16 @@ impl ASTNode {
         Ok((consumed_len, lhs))
     }
 
-    fn parse_parenthesised_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self)> {
+    fn parse_parenthesised_expr(
+        idx: usize,
+        tokens: &[Token],
+    ) -> Result<(usize, Self), ParsingError> {
         if let Some(token) = tokens.get(idx) {
             if *token != Token::OpenParen {
                 return Self::parse_primary_expr(idx, tokens);
             }
         } else {
-            return Err(color_eyre::Report::msg(format!(
-                "Unexpected end of array {tokens:?}"
-            )));
+            return Err(ParsingError::UnexpectedEndOfInput);
         }
 
         let (mut consumed_len, result) = Self::parse_expr(idx + 1, tokens)?;
@@ -112,11 +116,10 @@ impl ASTNode {
 
         if let Some(token) = tokens.get(idx + consumed_len) {
             if *token != Token::CloseParen {
-                return Err(color_eyre::Report::msg(format!(
-                    "Expected {:?} but found {:?}",
-                    Token::CloseParen,
-                    tokens[idx + consumed_len]
-                )));
+                return Err(ParsingError::UnexpectedToken {
+                    expected: Some(format!("{:?}", Token::CloseParen)),
+                    found: Some(format!("{:?}", tokens[idx + consumed_len])),
+                });
             }
         }
         consumed_len += 1; // Consuming the Close Paren
@@ -124,13 +127,11 @@ impl ASTNode {
         Ok((consumed_len, result))
     }
 
-    fn parse_primary_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self)> {
+    fn parse_primary_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
         let token = match tokens.get(idx) {
             Some(token) => token,
             None => {
-                return Err(color_eyre::Report::msg(format!(
-                    "Unexpected end of array {tokens:?}"
-                )));
+                return Err(ParsingError::UnexpectedEndOfInput);
             },
         };
 
@@ -138,9 +139,42 @@ impl ASTNode {
             Token::Identifier(var_name) => Ok((1, Self::Variable(var_name.clone()))),
             Token::NumericLiteral(n) => Ok((1, Self::Number(*n))),
 
-            token => Err(color_eyre::Report::msg(format!(
-                "Expected an expession but found {token:?}"
-            ))),
+            token => Err(ParsingError::UnexpectedToken {
+                expected: Some("Expression".to_string()),
+                found: Some(format!("{token:?}")),
+            }),
+        }
+    }
+}
+
+////////////////////////////////
+//       Error Handling       //
+////////////////////////////////
+
+#[derive(Debug)]
+pub enum ParsingError {
+    UnexpectedEndOfInput,
+    UnexpectedToken {
+        expected: Option<String>,
+        found: Option<String>,
+    },
+}
+
+impl std::error::Error for ParsingError {}
+impl std::fmt::Display for ParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnexpectedEndOfInput => write!(f, "Unexpected end of input array"),
+            Self::UnexpectedToken { expected, found } => {
+                let mut res = String::from("Unexpected token");
+                if let Some(expected) = expected {
+                    res = format!("{res}, expected '{expected}'");
+                }
+                if let Some(found) = found {
+                    res = format!("{res}, found '{found}'");
+                }
+                write!(f, "{res}")
+            },
         }
     }
 }
