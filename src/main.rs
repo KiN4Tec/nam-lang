@@ -18,7 +18,11 @@ fn on_update(repl: &mut repl::Repl, input: String) -> Result<()> {
         return Ok(());
     }
 
-    let tokens = lexer::try_tokenize(input)?;
+    // Unfortunately, at the time of writing, Rust does not seem to support direct conversion
+    // from a String to an array of characters, once it have it, this should be changed.
+    let code: Vec<char> = input.chars().collect();
+
+    let tokens = lexer::try_tokenize(code.as_ref())?;
     let ast = ast::ASTNode::try_from(&tokens)?;
     let result = eval::evaluate(ast, &mut repl.state)?;
 
