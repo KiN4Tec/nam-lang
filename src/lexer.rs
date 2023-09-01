@@ -192,7 +192,7 @@ pub fn try_tokenize(code: &[char]) -> Result<Vec<Token>, TokenizationError> {
             },
 
             'A'..='Z' | 'a'..='z' | '_' => {
-                let mut token = String::from(first);
+                let mut token = String::new();
                 while let Some(&next) = code.get(idx) {
                     if !next.is_ascii_alphanumeric() && next != '_' {
                         break;
