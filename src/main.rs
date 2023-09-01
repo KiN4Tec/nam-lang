@@ -8,7 +8,7 @@ mod eval;
 use color_eyre::eyre::Result;
 
 fn on_init(_repl: &mut repl::Repl) -> Result<()> {
-    println!("\nNamLang v0.1");
+    println!("\nNamLang v{}", env!("CARGO_PKG_VERSION"));
     Ok(())
 }
 
