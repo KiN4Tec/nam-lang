@@ -48,6 +48,10 @@ impl Repl {
             return Ok(());
         }
 
+        if input.trim().is_empty() {
+            return Ok(());
+        }
+
         // Unfortunately, at the time of writing, Rust does not seem to support direct conversion
         // from a String to an array of characters, once it have it, this should be changed.
         let code: Vec<char> = input.chars().collect();
