@@ -26,22 +26,17 @@ impl ASTNode {
     }
 
     fn parse_stmt(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
-        if let Some(var_token) = tokens.get(idx) {
-            if let Some(equals_token) = tokens.get(idx + 1) {
-                if let Token::Identifier(var_name) = var_token {
-                    if Token::OpAssign == *equals_token {
-                        // x = (expession)
-                        let (consumed_len, var_value) = Self::parse_expr(idx + 2, tokens)?;
-                        return Ok((
-                            consumed_len + 2,
-                            Self::Assignment(var_name.clone(), Box::new(var_value)),
-                        ));
-                    }
-                }
-            }
+        match (tokens.get(idx), tokens.get(idx + 1)) {
+            (Some(Token::Identifier(var_name)), Some(Token::OpAssign)) => {
+                // x = (expession)
+                let (consumed_len, var_value) = Self::parse_expr(idx + 2, tokens)?;
+                Ok((
+                    consumed_len + 2,
+                    Self::Assignment(var_name.clone(), Box::new(var_value)),
+                ))
+            },
+            (_, _) => Self::parse_expr(idx, tokens),
         }
-
-        Self::parse_expr(idx, tokens)
     }
 
     fn parse_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
