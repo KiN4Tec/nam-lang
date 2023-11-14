@@ -1,81 +1,93 @@
-use color_eyre::eyre::Result;
-use crate::state::State;
+use {
+    color_eyre::eyre::Result,
+    reedline::Signal,
+    crate::{state::State, lexer, ast, eval},
+};
 
 pub struct Repl {
-    on_init: fn(&mut Self) -> Result<()>,
-    on_update: fn(&mut Self, String) -> Result<()>,
-    on_exit: fn() -> Result<()>,
-
     pub is_running: bool,
-    pub crash_on_error: bool,
     pub state: State,
 }
 
 impl Repl {
-    pub fn new(
-        on_init: fn(&mut Self) -> Result<()>,
-        on_update: fn(&mut Self, String) -> Result<()>,
-        on_exit: fn() -> Result<()>,
-
-        crash_on_error: bool,
-        initial_state: Option<State>,
-    ) -> Self {
-        let initial_state = match initial_state {
-            Some(state) => state,
-            None => State::new(),
-        };
-
+    pub fn new() -> Self {
         Repl {
-            on_init,
-            on_update,
-            on_exit,
-
             is_running: false,
-            crash_on_error,
-            state: initial_state,
+            state: State::new(),
         }
     }
 
     pub fn run(&mut self) -> Result<()> {
-        self._on_init()?;
+        let mut line_editor = reedline::Reedline::create();
+        let prompt = Prompt::default();
 
-        while self.is_running {
-            self._on_update()?;
-        }
+        println!("\nNamLang v{}", env!("CARGO_PKG_VERSION"));
 
-        self._on_exit()?;
-        Ok(())
-    }
-
-    fn _on_init(&mut self) -> Result<()> {
-        (self.on_init)(self)?;
         self.is_running = true;
-        Ok(())
-    }
-
-    fn _on_update(&mut self) -> Result<()> {
-        print!("> ");
-        std::io::Write::flush(&mut std::io::stdout())?;
-
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
-
-        match (self.on_update)(self, input) {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                if self.crash_on_error {
-                    Err(e)
-                } else {
-                    eprintln!("{e:?}");
-                    Ok(())
-                }
-            },
+        while self.is_running {
+            let sig = line_editor.read_line(&prompt)?;
+            match sig {
+                Signal::CtrlD | Signal::CtrlC => break,
+                Signal::Success(input) => {
+                    let r = self.on_prompt(input);
+                    if let Err(e) = r {
+                        eprintln!("{e:?}");
+                    }
+                },
+            }
         }
-    }
 
-    fn _on_exit(&mut self) -> Result<()> {
-        (self.on_exit)()?;
+        println!("Goodbye!");
         std::io::Write::flush(&mut std::io::stdout())?;
         Ok(())
+    }
+
+    fn on_prompt(&mut self, input: String) -> Result<()> {
+        if input.trim() == "exit" {
+            self.is_running = false;
+            return Ok(());
+        }
+
+        // Unfortunately, at the time of writing, Rust does not seem to support direct conversion
+        // from a String to an array of characters, once it have it, this should be changed.
+        let code: Vec<char> = input.chars().collect();
+
+        let tokens = lexer::try_tokenize(code.as_ref())?;
+        let ast = ast::ASTNode::try_from(&tokens)?;
+        let result = eval::evaluate(ast, &mut self.state)?;
+
+        println!("ans = {result}");
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+pub struct Prompt {}
+
+impl reedline::Prompt for Prompt {
+    fn render_prompt_left(&self) -> std::borrow::Cow<str> {
+        std::borrow::Cow::Borrowed("nam")
+    }
+
+    fn render_prompt_right(&self) -> std::borrow::Cow<str> {
+        std::borrow::Cow::Borrowed("")
+    }
+
+    fn render_prompt_indicator(
+        &self,
+        _prompt_mode: reedline::PromptEditMode,
+    ) -> std::borrow::Cow<str> {
+        std::borrow::Cow::Borrowed(" > ")
+    }
+
+    fn render_prompt_multiline_indicator(&self) -> std::borrow::Cow<str> {
+        std::borrow::Cow::Borrowed(" > ")
+    }
+
+    fn render_prompt_history_search_indicator(
+        &self,
+        _history_search: reedline::PromptHistorySearch,
+    ) -> std::borrow::Cow<str> {
+        std::borrow::Cow::Borrowed(" > ")
     }
 }
