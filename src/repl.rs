@@ -60,7 +60,7 @@ impl Repl {
         let ast = ast::ASTNode::try_from(&tokens)?;
         let result = eval::evaluate(ast, &mut self.state)?;
 
-        println!("ans = {result}");
+        println!("\nans = {result}");
         Ok(())
     }
 }
@@ -70,7 +70,7 @@ pub struct Prompt {}
 
 impl reedline::Prompt for Prompt {
     fn render_prompt_left(&self) -> std::borrow::Cow<str> {
-        std::borrow::Cow::Borrowed("nam")
+        std::borrow::Cow::Borrowed(" \nnam")
     }
 
     fn render_prompt_right(&self) -> std::borrow::Cow<str> {
