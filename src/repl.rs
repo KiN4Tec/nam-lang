@@ -37,7 +37,7 @@ impl Repl {
             }
         }
 
-        println!("Goodbye!");
+        println!("\nGoodbye!");
         std::io::Write::flush(&mut std::io::stdout())?;
         Ok(())
     }
