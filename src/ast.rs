@@ -10,9 +10,43 @@ pub enum ASTNode {
 
     BinaryExpr {
         lhs: Box<Self>,
-        op: Token,
+        op: BinaryOpKind,
         rhs: Box<Self>,
     },
+}
+
+#[derive(Debug)]
+pub enum BinaryOpKind {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+}
+
+impl TryFrom<Token> for BinaryOpKind {
+    type Error = ParsingError;
+
+    fn try_from(token: Token) -> std::result::Result<Self, Self::Error> {
+        match token {
+            Token::OpAdd => Ok(Self::Add),
+            Token::OpSubtract => Ok(Self::Subtract),
+            Token::OpMultiply => Ok(Self::Multiply),
+            Token::OpDivide => Ok(Self::Divide),
+
+            _ => Err(ParsingError::UnexpectedToken {
+                expected: Some("Operator".to_string()),
+                found: Some(token.stringify()),
+            }),
+        }
+    }
+}
+
+impl TryFrom<&Token> for BinaryOpKind {
+    type Error = ParsingError;
+
+    fn try_from(token: &Token) -> std::result::Result<Self, Self::Error> {
+        Self::try_from(token.clone())
+    }
 }
 
 impl ASTNode {
@@ -26,7 +60,24 @@ impl ASTNode {
     }
 
     fn parse_stmt(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
-        let (primary_len, primary) = Self::parse_expr(idx, tokens)?;
+        let (res_len, res) = Self::parse_expr(idx, tokens)?;
+
+        match tokens.get(idx + res_len) {
+            Some(Token::EndOfFile) => Ok((res_len, res)),
+            Some(token) => Err(ParsingError::UnexpectedToken {
+                expected: Some(Token::EndOfFile.stringify()),
+                found: Some(token.stringify()),
+            }),
+            None => unreachable!(),
+        }
+    }
+
+    fn parse_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
+        Self::parse_assignment_expr(idx, tokens)
+    }
+
+    fn parse_assignment_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
+        let (primary_len, primary) = Self::parse_additive_expr(idx, tokens)?;
 
         // Assignment Statement (x = 5)
         if let Self::Variable(lhs) = &primary {
@@ -42,19 +93,14 @@ impl ASTNode {
         Ok((primary_len, primary))
     }
 
-    fn parse_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
-        Self::parse_additive_expr(idx, tokens)
-    }
-
     fn parse_additive_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
         let (mut consumed_len, mut lhs) = Self::parse_multiplicative_expr(idx, tokens)?;
 
         while let Some(token) = tokens.get(idx + consumed_len) {
-            if *token != Token::OpAdd && *token != Token::OpSuptract {
+            if *token != Token::OpAdd && *token != Token::OpSubtract {
                 break;
             }
-
-            let op = token.clone();
+            // Consume the operator
             consumed_len += 1;
 
             let (consumed_rhs, rhs) = Self::parse_multiplicative_expr(idx + consumed_len, tokens)?;
@@ -62,7 +108,7 @@ impl ASTNode {
 
             lhs = Self::BinaryExpr {
                 lhs: Box::new(lhs),
-                op,
+                op: token.try_into()?,
                 rhs: Box::new(rhs),
             };
         }
@@ -80,8 +126,7 @@ impl ASTNode {
             if *token != Token::OpMultiply && *token != Token::OpDivide {
                 break;
             }
-
-            let op = token.clone();
+            // Consume the operator
             consumed_len += 1;
 
             let (consumed_rhs, rhs) = Self::parse_parenthesised_expr(idx + consumed_len, tokens)?;
@@ -89,7 +134,7 @@ impl ASTNode {
 
             lhs = Self::BinaryExpr {
                 lhs: Box::new(lhs),
-                op,
+                op: token.try_into()?,
                 rhs: Box::new(rhs),
             };
         }
@@ -123,8 +168,8 @@ impl ASTNode {
             None => return Err(ParsingError::UnexpectedEndOfInput),
             Some(_) => {
                 return Err(ParsingError::UnexpectedToken {
-                    expected: Some(format!("{:?}", Token::CloseParen)),
-                    found: Some(format!("{:?}", tokens[idx + consumed_len])),
+                    expected: Some(Token::CloseParen.stringify()),
+                    found: Some(tokens[idx + consumed_len].stringify()),
                 })
             },
         }

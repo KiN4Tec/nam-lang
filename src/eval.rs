@@ -1,4 +1,4 @@
-use crate::ast::ASTNode;
+use crate::ast::{ASTNode, BinaryOpKind};
 use crate::state::{State, RuntimeVal};
 
 pub fn evaluate(ast: ASTNode, state: &mut State) -> Result<RuntimeVal, EvaluationError> {
@@ -27,14 +27,11 @@ pub fn evaluate(ast: ASTNode, state: &mut State) -> Result<RuntimeVal, Evaluatio
                 _ => return Err(EvaluationError::NotANumber),
             };
 
-            use crate::lexer::Token;
             match op {
-                Token::OpAdd => Ok(RuntimeVal::Number(res_lhs + res_rhs)),
-                Token::OpSuptract => Ok(RuntimeVal::Number(res_lhs - res_rhs)),
-                Token::OpMultiply => Ok(RuntimeVal::Number(res_lhs * res_rhs)),
-                Token::OpDivide => Ok(RuntimeVal::Number(res_lhs / res_rhs)),
-
-                _ => unimplemented!(),
+                BinaryOpKind::Add => Ok(RuntimeVal::Number(res_lhs + res_rhs)),
+                BinaryOpKind::Subtract => Ok(RuntimeVal::Number(res_lhs - res_rhs)),
+                BinaryOpKind::Multiply => Ok(RuntimeVal::Number(res_lhs * res_rhs)),
+                BinaryOpKind::Divide => Ok(RuntimeVal::Number(res_lhs / res_rhs)),
             }
         },
     }

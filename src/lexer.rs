@@ -3,7 +3,7 @@ use color_eyre::eyre::Result;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     OpAdd,
-    OpSuptract,
+    OpSubtract,
     OpMultiply,
     OpDivide,
     OpAssign,
@@ -15,6 +15,41 @@ pub enum Token {
     Identifier(String),
 
     EndOfFile,
+}
+
+impl Token {
+    pub fn stringify(&self) -> String {
+        let res = match self {
+            Self::OpAdd => "OpAdd",
+            Self::OpSubtract => "OpSubstract",
+            Self::OpMultiply => "OpMultiply",
+            Self::OpDivide => "OpDivide",
+            Self::OpAssign => "OpAssign",
+
+            Self::OpenParen => "OpenParen",
+            Self::CloseParen => "CloseParen",
+
+            Self::NumericLiteral(number) => {
+                if number.is_nan() {
+                    "NumericLiteral"
+                } else {
+                    return format!("NumericLiteral: {number}");
+                }
+            },
+
+            Self::Identifier(name) => {
+                if name.is_empty() {
+                    "Identifier"
+                } else {
+                    return format!("Identifier: {name}");
+                }
+            },
+
+            Self::EndOfFile => "EndOfFile",
+        };
+
+        res.to_string()
+    }
 }
 
 impl TryFrom<String> for Token {
@@ -34,7 +69,7 @@ impl TryFrom<String> for Token {
 
         match first {
             '+' => Ok(Self::OpAdd),
-            '-' => Ok(Self::OpSuptract),
+            '-' => Ok(Self::OpSubtract),
             '*' => Ok(Self::OpMultiply),
             '/' => Ok(Self::OpDivide),
             '=' => Ok(Self::OpAssign),
