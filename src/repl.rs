@@ -27,7 +27,8 @@ impl Repl {
         while self.is_running {
             let sig = line_editor.read_line(&prompt)?;
             match sig {
-                Signal::CtrlD | Signal::CtrlC => break,
+                Signal::CtrlD => break,
+                Signal::CtrlC => continue,
                 Signal::Success(input) => {
                     let r = self.on_prompt(input);
                     if let Err(e) = r {
