@@ -2,7 +2,7 @@
 name = "nam"
 authors = ["Mouhammed Nashat Helmi <Nashat.Helmi+Nam@Gmail.com>"]
 license = "MIT"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 edition = "2021"
 publish = false
 
