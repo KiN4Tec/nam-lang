@@ -14,6 +14,8 @@ pub enum Token {
     NumericLiteral(f64),
     Identifier(String),
 
+    SemiColon,
+    EndOfLine,
     EndOfFile,
 }
 
@@ -45,6 +47,8 @@ impl Token {
                 }
             },
 
+            Self::SemiColon => "SemiColon",
+            Self::EndOfLine => "EndOfLine",
             Self::EndOfFile => "EndOfFile",
         };
 
@@ -99,6 +103,8 @@ impl TryFrom<String> for Token {
                 Ok(Self::Identifier(input))
             },
 
+            ';' => Ok(Self::SemiColon),
+
             first => Err(TokenizationError {
                 kind: TokenizationErrorKind::UnexpectedChar(first),
                 token_str: Some(input),
@@ -122,7 +128,7 @@ pub fn try_tokenize(code: &[char]) -> Result<Vec<Token>, TokenizationError> {
 
     while let Some(&first) = code.get(idx) {
         match first {
-            '+' | '-' | '*' | '/' | '(' | ')' | '=' => {
+            '+' | '-' | '*' | '/' | '(' | ')' | '=' | ';' => {
                 res.push(Token::try_from(first.to_string())?);
                 idx += 1;
             },
@@ -237,6 +243,19 @@ pub fn try_tokenize(code: &[char]) -> Result<Vec<Token>, TokenizationError> {
                 }
                 res.push(Token::try_from(token)?);
             },
+
+            '\n' => {
+                idx += 1;
+                res.push(Token::EndOfLine);
+            }
+
+            '\r' => {
+                idx += 1;
+                if code.get(idx) == Some(&'\n') {
+                    idx += 1;
+                }
+                res.push(Token::EndOfLine);
+            }
 
             _ if first.is_whitespace() => idx += 1,
             c => {

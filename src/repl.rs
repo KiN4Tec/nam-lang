@@ -59,9 +59,8 @@ impl Repl {
 
         let tokens = lexer::try_tokenize(code.as_ref())?;
         let ast = ast::ASTNode::try_from(&tokens)?;
-        let result = eval::evaluate(ast, &mut self.state)?;
+        eval::evaluate(ast, &mut self.state)?;
 
-        println!("\nans = {result}");
         Ok(())
     }
 }

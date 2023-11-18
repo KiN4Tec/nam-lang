@@ -1,17 +1,26 @@
 use color_eyre::eyre::Result;
+use reedline::Span;
 use crate::lexer::Token;
 
 #[derive(Debug)]
-pub enum ASTNode {
+pub struct ASTNode {
+    pub kind: ASTNodeKind,
+    pub span: Option<Span>,
+    pub store_in_ans: bool,
+    pub print_result: bool,
+}
+
+#[derive(Debug)]
+pub enum ASTNodeKind {
     Variable(String),
     Number(f64),
 
-    Assignment(String, Box<Self>),
+    Assignment(String, Box<ASTNode>),
 
     BinaryExpr {
-        lhs: Box<Self>,
+        lhs: Box<ASTNode>,
         op: BinaryOpKind,
-        rhs: Box<Self>,
+        rhs: Box<ASTNode>,
     },
 }
 
@@ -49,27 +58,60 @@ impl TryFrom<&Token> for BinaryOpKind {
     }
 }
 
-impl ASTNode {
-    pub fn try_from(tokens: &[Token]) -> Result<Self, ParsingError> {
+impl TryFrom<&Vec<Token>> for ASTNode {
+    type Error = ParsingError;
+
+    fn try_from(tokens: &Vec<Token>) -> Result<Self, Self::Error> {
         let (_, res) = Self::parse_program(0, tokens)?;
         Ok(res)
     }
+}
 
+impl From<ASTNodeKind> for ASTNode {
+    fn from(value: ASTNodeKind) -> Self {
+        Self {
+            kind: value,
+            span: None,
+            store_in_ans: false,
+            print_result: false,
+        }
+    }
+}
+
+impl ASTNode {
     fn parse_program(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
         Self::parse_stmt(idx, tokens)
     }
 
     fn parse_stmt(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
-        let (res_len, res) = Self::parse_expr(idx, tokens)?;
+        let (res_len, mut res) = Self::parse_expr(idx, tokens)?;
 
         match tokens.get(idx + res_len) {
-            Some(Token::EndOfFile) => Ok((res_len, res)),
-            Some(token) => Err(ParsingError::UnexpectedToken {
+            Some(Token::EndOfFile) | Some(Token::EndOfLine) => {
+                res.print_result = true;
+            },
+
+            Some(Token::SemiColon) => {
+                res.print_result = false;
+            }
+
+            Some(token) => return Err(ParsingError::UnexpectedToken {
                 expected: Some(Token::EndOfFile.stringify()),
                 found: Some(token.stringify()),
             }),
+
             None => unreachable!(),
         }
+
+        res.store_in_ans = match res.kind {
+            ASTNodeKind::Number(_) => true,
+            ASTNodeKind::BinaryExpr { lhs: _, op: _, rhs: _ } => true,
+
+            ASTNodeKind::Variable(_) => false,
+            ASTNodeKind::Assignment(_, _) => false,
+        };
+
+        Ok((res_len, res))
     }
 
     fn parse_expr(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
@@ -80,12 +122,12 @@ impl ASTNode {
         let (primary_len, primary) = Self::parse_additive_expr(idx, tokens)?;
 
         // Assignment Statement (x = 5)
-        if let Self::Variable(lhs) = &primary {
+        if let ASTNodeKind::Variable(lhs) = &primary.kind {
             if tokens.get(idx + primary_len) == Some(&Token::OpAssign) {
                 let (rhs_len, rhs) = Self::parse_expr(idx + primary_len + 1, tokens)?;
                 return Ok((
                     primary_len + 1 + rhs_len,
-                    Self::Assignment(lhs.to_string(), Box::new(rhs)),
+                    ASTNodeKind::Assignment(lhs.to_string(), Box::new(rhs)).into(),
                 ));
             }
         }
@@ -106,11 +148,11 @@ impl ASTNode {
             let (consumed_rhs, rhs) = Self::parse_multiplicative_expr(idx + consumed_len, tokens)?;
             consumed_len += consumed_rhs;
 
-            lhs = Self::BinaryExpr {
+            lhs = ASTNodeKind::BinaryExpr {
                 lhs: Box::new(lhs),
                 op: token.try_into()?,
                 rhs: Box::new(rhs),
-            };
+            }.into();
         }
 
         Ok((consumed_len, lhs))
@@ -132,11 +174,11 @@ impl ASTNode {
             let (consumed_rhs, rhs) = Self::parse_parenthesised_expr(idx + consumed_len, tokens)?;
             consumed_len += consumed_rhs;
 
-            lhs = Self::BinaryExpr {
+            lhs = ASTNodeKind::BinaryExpr {
                 lhs: Box::new(lhs),
                 op: token.try_into()?,
                 rhs: Box::new(rhs),
-            };
+            }.into();
         }
 
         Ok((consumed_len, lhs))
@@ -188,15 +230,24 @@ impl ASTNode {
             },
         };
 
-        match token {
-            Token::Identifier(var_name) => Ok((1, Self::Variable(var_name.clone()))),
-            Token::NumericLiteral(n) => Ok((1, Self::Number(*n))),
+        let kind = match token {
+            Token::Identifier(var_name) => ASTNodeKind::Variable(var_name.clone()),
+            Token::NumericLiteral(n) => ASTNodeKind::Number(*n),
 
-            token => Err(ParsingError::UnexpectedToken {
+            token => return Err(ParsingError::UnexpectedToken {
                 expected: Some("Expression".to_string()),
-                found: Some(format!("{token:?}")),
+                found: Some(token.stringify()),
             }),
-        }
+        };
+
+        let res = Self {
+            kind,
+            span: None,
+            store_in_ans: false,
+            print_result: false,
+        };
+
+        Ok((1, res))
     }
 }
 

@@ -1,22 +1,44 @@
-use crate::ast::{ASTNode, BinaryOpKind};
+use crate::ast::{ASTNode, ASTNodeKind, BinaryOpKind};
 use crate::state::{State, RuntimeVal};
 
 pub fn evaluate(ast: ASTNode, state: &mut State) -> Result<RuntimeVal, EvaluationError> {
-    match ast {
-        ASTNode::Number(n) => Ok(RuntimeVal::Number(n)),
+    match ast.kind {
+        ASTNodeKind::Number(n) => {
+            let res = RuntimeVal::Number(n);
 
-        ASTNode::Variable(var_name) => match state.get_var(&var_name) {
-            Some(var_value) => Ok(var_value.clone()),
-            None => Err(EvaluationError::NonexistantVar(var_name)),
-        },
+            if ast.store_in_ans {
+                state.assign_var("ans".to_string(), res.clone());
+                if ast.print_result {
+                    println!("\nans = {n}");
+                }
+            }
 
-        ASTNode::Assignment(var_name, var_value) => {
-            let res = evaluate(*var_value, state)?;
-            state.assign_var(var_name, res.clone());
             Ok(res)
         },
 
-        ASTNode::BinaryExpr { lhs, op, rhs } => {
+        ASTNodeKind::Variable(var_name) => match state.get_var(&var_name) {
+            Some(var_value) => {
+                if ast.print_result {
+                    println!("\n{var_name} = {var_value}");
+                }
+
+                Ok(var_value.clone())
+            },
+            None => Err(EvaluationError::NonexistantVar(var_name)),
+        },
+
+        ASTNodeKind::Assignment(var_name, var_value) => {
+            let res = evaluate(*var_value, state)?;
+            state.assign_var(var_name.clone(), res.clone());
+
+            if ast.print_result {
+                println!("\n{var_name} = {res}");
+            }
+
+            Ok(res)
+        },
+
+        ASTNodeKind::BinaryExpr { lhs, op, rhs } => {
             let res_lhs: f64 = match evaluate(*lhs, state)? {
                 RuntimeVal::Number(var_value) => var_value,
                 _ => return Err(EvaluationError::NotANumber),
@@ -27,12 +49,21 @@ pub fn evaluate(ast: ASTNode, state: &mut State) -> Result<RuntimeVal, Evaluatio
                 _ => return Err(EvaluationError::NotANumber),
             };
 
-            match op {
-                BinaryOpKind::Add => Ok(RuntimeVal::Number(res_lhs + res_rhs)),
-                BinaryOpKind::Subtract => Ok(RuntimeVal::Number(res_lhs - res_rhs)),
-                BinaryOpKind::Multiply => Ok(RuntimeVal::Number(res_lhs * res_rhs)),
-                BinaryOpKind::Divide => Ok(RuntimeVal::Number(res_lhs / res_rhs)),
+            let res = match op {
+                BinaryOpKind::Add => RuntimeVal::Number(res_lhs + res_rhs),
+                BinaryOpKind::Subtract => RuntimeVal::Number(res_lhs - res_rhs),
+                BinaryOpKind::Multiply => RuntimeVal::Number(res_lhs * res_rhs),
+                BinaryOpKind::Divide => RuntimeVal::Number(res_lhs / res_rhs),
+            };
+
+            if ast.store_in_ans {
+                state.assign_var("ans".to_string(), res.clone());
+                if ast.print_result {
+                    println!("\nans = {res}");
+                }
             }
+
+            Ok(res)
         },
     }
 }
