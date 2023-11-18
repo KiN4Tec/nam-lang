@@ -1,8 +1,11 @@
 [package]
-name = "nam-lang"
+name = "nam"
+authors = ["Mouhammed Nashat Helmi <Nashat.Helmi+Nam@Gmail.com>"]
+license = "MIT"
 version = "0.2.0-alpha"
 edition = "2021"
+publish = false
 
 [dependencies]
 color-eyre = "0.6.2"
-reedline = "0.25.0"
+reedline = "0.26.0"
