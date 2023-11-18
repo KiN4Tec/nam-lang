@@ -1,14 +1,8 @@
 edition = "2021"
 
-disable_all_formatting = false           # Default
-print_misformatted_file_names = false    # Default, Undocumented
-
-hard_tabs = false    # Default
+hard_tabs = true
 newline_style = "Unix"
 
 match_arm_leading_pipes = "Never"    # Default
 match_block_trailing_comma = true
 use_field_init_shorthand = true
-
-reorder_imports = false
-reorder_modules = false
