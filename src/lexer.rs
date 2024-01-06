@@ -2,19 +2,24 @@ use color_eyre::eyre::Result;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-	OpAdd,
-	OpSubtract,
-	OpMultiply,
-	OpDivide,
-	OpAssign,
+	OpAdd,      // +
+	OpSubtract, // -
+	OpMultiply, // *
+	OpDivide,   // /
+	OpAssign,   // =
 
-	OpenParen,
-	CloseParen,
+	OpenParen,  // )
+	CloseParen, // (
+	OpenBrace,  // [
+	CloseBrace, // ]
+	OpenCurly,  // {
+	CloseCurly, // }
 
 	NumericLiteral(f64),
 	Identifier(String),
 
-	SemiColon,
+	Comma,      // ,
+	SemiColon,  // ;
 	EndOfLine,
 	EndOfFile,
 }
@@ -30,6 +35,10 @@ impl Token {
 
 			Self::OpenParen => "OpenParen",
 			Self::CloseParen => "CloseParen",
+			Self::OpenBrace => "OpenBrace",
+			Self::CloseBrace => "CloseBrace",
+			Self::OpenCurly => "OpenCurly",
+			Self::CloseCurly => "CloseCurly",
 
 			Self::NumericLiteral(number) => {
 				if number.is_nan() {
@@ -47,6 +56,7 @@ impl Token {
 				}
 			},
 
+			Self::Comma => "Comma",
 			Self::SemiColon => "SemiColon",
 			Self::EndOfLine => "EndOfLine",
 			Self::EndOfFile => "EndOfFile",
@@ -56,10 +66,12 @@ impl Token {
 	}
 }
 
-impl TryFrom<String> for Token {
-	type Error = TokenizationError;
+impl std::str::FromStr for Token {
+	type Err = TokenizationError;
 
-	fn try_from(input: String) -> std::result::Result<Self, Self::Error> {
+	fn from_str(input: &str) -> Result<Self, Self::Err> {
+		let input = input.to_string();
+
 		let first = match input.chars().next() {
 			Some(c) => c,
 			None => {
@@ -80,9 +92,13 @@ impl TryFrom<String> for Token {
 
 			'(' => Ok(Self::OpenParen),
 			')' => Ok(Self::CloseParen),
+			'[' => Ok(Self::OpenBrace),
+			']' => Ok(Self::CloseBrace),
+			'{' => Ok(Self::OpenCurly),
+			'}' => Ok(Self::CloseCurly),
 
 			'0'..='9' => match input.parse() {
-				Ok(r) => Ok(Self::NumericLiteral(r)),
+				Ok(n) => Ok(Self::NumericLiteral(n)),
 				Err(e) => Err(TokenizationError {
 					kind: TokenizationErrorKind::NotANumber,
 					token_str: Some(input),
@@ -103,6 +119,7 @@ impl TryFrom<String> for Token {
 				Ok(Self::Identifier(input))
 			},
 
+			',' => Ok(Self::Comma),
 			';' => Ok(Self::SemiColon),
 
 			first => Err(TokenizationError {
@@ -126,110 +143,17 @@ pub fn try_tokenize(code: &[char]) -> Result<Vec<Token>, TokenizationError> {
 	let mut res = vec![];
 	let mut idx = 0;
 
-	while let Some(&first) = code.get(idx) {
+	while let Some(first) = code.get(idx) {
 		match first {
-			'+' | '-' | '*' | '/' | '(' | ')' | '=' | ';' => {
-				res.push(Token::try_from(first.to_string())?);
+			'+' | '-' | '*' | '/' | '(' | ')' | '[' | ']' | '{' | '}' | '=' | ',' | ';' => {
+				res.push(first.to_string().parse()?);
 				idx += 1;
 			},
 
 			'0'..='9' => {
-				let mut token = String::new();
-				let mut is_frac = false;
-				let mut is_expo = false;
-
-				while let Some(&next) = code.get(idx) {
-					match next {
-						'0'..='9' => token.push(next),
-
-						'.' => {
-							token.push('.');
-							if is_expo {
-								return Err(TokenizationError {
-                                    kind: TokenizationErrorKind::UnexpectedChar('.'),
-                                    token_str: Some(token),
-                                    message: Some(String::from(
-                                        "Could not parse a numeric literal with a dot after the 'e' in a scientific notation.",
-                                    )),
-                                });
-							}
-							if is_frac {
-								return Err(TokenizationError {
-									kind: TokenizationErrorKind::UnexpectedChar('.'),
-									token_str: Some(token),
-									message: Some(String::from(
-										"Could not parse a numeric literal with more than one dot.",
-									)),
-								});
-							}
-							is_frac = true;
-						},
-
-						'e' => {
-							token.push('e');
-
-							if is_expo {
-								return Err(TokenizationError {
-                                    kind: TokenizationErrorKind::UnexpectedChar('e'),
-                                    token_str: Some(token),
-                                    message: Some(String::from(
-                                        "Could not parse a numeric literal with more than one 'e' suffix,\n(Invalid scientific notation :)",
-                                    )),
-                                });
-							}
-							is_expo = true;
-							is_frac = true;
-							idx += 1;
-
-							while code.get(idx) == Some(&'_') {
-								idx += 1;
-							}
-
-							match code.get(idx) {
-								Some('+') => token.push('+'),
-								Some('-') => token.push('-'),
-								Some(&n) if n.is_ascii_digit() => token.push(n),
-								None | Some(_) => {
-									return Err(TokenizationError {
-										kind: TokenizationErrorKind::UnexpectedChar('e'),
-										token_str: Some(token),
-										message: Some(String::from(
-											"The scientific notation is not complete.",
-										)),
-									})
-								},
-							}
-						},
-
-						'A'..='Z' | 'a'..='z' => {
-							token.push(next);
-							return Err(TokenizationError {
-								kind: TokenizationErrorKind::UnspportedSyntax(next.to_string()),
-								token_str: Some(token),
-								message: Some(String::from(
-									"Suffixes other than 'e' are not supported.",
-								)),
-							});
-						},
-
-						'_' => {},
-						_ => break,
-					}
-					idx += 1;
-				}
-
-				let res_num = match token.parse() {
-					Ok(r) => Token::NumericLiteral(r),
-					Err(e) => {
-						return Err(TokenizationError {
-							kind: TokenizationErrorKind::NotANumber,
-							token_str: Some(token),
-							message: Some(e.to_string()),
-						});
-					},
-				};
-
-				res.push(res_num);
+				let (token_len, token) = try_tokenize_number(idx, code)?;
+				res.push(token);
+				idx += token_len;
 			},
 
 			'A'..='Z' | 'a'..='z' | '_' => {
@@ -241,7 +165,7 @@ pub fn try_tokenize(code: &[char]) -> Result<Vec<Token>, TokenizationError> {
 					token.push(next);
 					idx += 1;
 				}
-				res.push(Token::try_from(token)?);
+				res.push(token.parse()?);
 			},
 
 			'\n' => {
@@ -258,7 +182,7 @@ pub fn try_tokenize(code: &[char]) -> Result<Vec<Token>, TokenizationError> {
 			},
 
 			_ if first.is_whitespace() => idx += 1,
-			c => {
+			&c => {
 				return Err(TokenizationError {
 					kind: TokenizationErrorKind::UnexpectedChar(c),
 					token_str: None,
@@ -270,6 +194,110 @@ pub fn try_tokenize(code: &[char]) -> Result<Vec<Token>, TokenizationError> {
 
 	res.push(Token::EndOfFile);
 	Ok(res)
+}
+
+pub fn try_tokenize_number(idx: usize, code: &[char]) -> Result<(usize, Token), TokenizationError> {
+	let mut token = String::new();
+	let mut is_frac = false;
+	let mut is_expo = false;
+	let mut token_len = 0;
+
+	while let Some(&next) = code.get(idx + token_len) {
+		match next {
+			'0'..='9' => {
+				token.push(next);
+				token_len += 1;
+			},
+
+			'.' => {
+				token.push('.');
+				token_len += 1;
+
+				if is_expo {
+					return Err(TokenizationError {
+						kind: TokenizationErrorKind::UnexpectedChar('.'),
+						token_str: Some(token),
+						message: Some(String::from(
+							"Could not parse a numeric literal with a dot after the 'e' in a scientific notation.",
+						)),
+					});
+				}
+
+				if is_frac {
+					return Err(TokenizationError {
+						kind: TokenizationErrorKind::UnexpectedChar('.'),
+						token_str: Some(token),
+						message: Some(String::from(
+							"Could not parse a numeric literal with more than one dot.",
+						)),
+					});
+				}
+
+				is_frac = true;
+			},
+
+			'e' => {
+				token.push('e');
+				token_len += 1;
+
+				if is_expo {
+					return Err(TokenizationError {
+						kind: TokenizationErrorKind::UnexpectedChar('e'),
+						token_str: Some(token),
+						message: Some(String::from(
+							"Could not parse a numeric literal with more than one 'e' suffix,\n(Invalid scientific notation :)",
+						)),
+					});
+				}
+
+				is_expo = true;
+				is_frac = true;
+
+				while code.get(idx + token_len) == Some(&'_') {
+					token_len += 1;
+				}
+
+				match code.get(idx + token_len) {
+					Some('+') => token.push('+'),
+					Some('-') => token.push('-'),
+					Some(&n) if n.is_ascii_digit() => token.push(n),
+					None | Some(_) => {
+						return Err(TokenizationError {
+							kind: TokenizationErrorKind::UnexpectedChar('e'),
+							token_str: Some(token),
+							message: Some(String::from(
+								"The scientific notation is not complete.",
+							)),
+						})
+					},
+				}
+				token_len += 1;
+			},
+
+			'A'..='Z' | 'a'..='z' => {
+				token.push(next);
+				return Err(TokenizationError {
+					kind: TokenizationErrorKind::UnspportedSyntax(next.to_string()),
+					token_str: Some(token),
+					message: Some(String::from(
+						"Suffixes other than 'e' are not supported.",
+					)),
+				});
+			},
+
+			'_' => {},
+			_ => break,
+		}
+	}
+
+	match token.parse() {
+		Ok(n) => Ok((token_len, Token::NumericLiteral(n))),
+		Err(e) => Err(TokenizationError {
+			kind: TokenizationErrorKind::NotANumber,
+			token_str: Some(token),
+			message: Some(e.to_string()),
+		}),
+	}
 }
 
 ////////////////////////////////

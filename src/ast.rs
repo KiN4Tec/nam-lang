@@ -14,14 +14,15 @@ pub struct ASTNode {
 pub enum ASTNodeKind {
 	Variable(String),
 	Number(f64),
+	Matrix(Vec<Vec<ASTNode>>),
 
 	Assignment(String, Box<ASTNode>),
 
-	BinaryExpr {
-		lhs: Box<ASTNode>,
-		op: BinaryOpKind,
-		rhs: Box<ASTNode>,
-	},
+	BinaryExpr (
+		BinaryOpKind,
+		Box<ASTNode>,
+		Box<ASTNode>,
+	),
 }
 
 #[derive(Debug)]
@@ -107,11 +108,8 @@ impl ASTNode {
 
 		res.store_in_ans = match res.kind {
 			ASTNodeKind::Number(_) => true,
-			ASTNodeKind::BinaryExpr {
-				lhs: _,
-				op: _,
-				rhs: _,
-			} => true,
+			ASTNodeKind::Matrix(_) => true,
+			ASTNodeKind::BinaryExpr(_, _, _) => true,
 
 			ASTNodeKind::Variable(_) => false,
 			ASTNodeKind::Assignment(_, _) => false,
@@ -154,11 +152,11 @@ impl ASTNode {
 			let (consumed_rhs, rhs) = Self::parse_multiplicative_expr(idx + consumed_len, tokens)?;
 			consumed_len += consumed_rhs;
 
-			lhs = ASTNodeKind::BinaryExpr {
-				lhs: Box::new(lhs),
-				op: token.try_into()?,
-				rhs: Box::new(rhs),
-			}
+			lhs = ASTNodeKind::BinaryExpr (
+				token.try_into()?,
+				Box::new(lhs),
+				Box::new(rhs),
+			)
 			.into();
 		}
 
@@ -181,11 +179,11 @@ impl ASTNode {
 			let (consumed_rhs, rhs) = Self::parse_parenthesised_expr(idx + consumed_len, tokens)?;
 			consumed_len += consumed_rhs;
 
-			lhs = ASTNodeKind::BinaryExpr {
-				lhs: Box::new(lhs),
-				op: token.try_into()?,
-				rhs: Box::new(rhs),
-			}
+			lhs = ASTNodeKind::BinaryExpr (
+				token.try_into()?,
+				Box::new(lhs),
+				Box::new(rhs),
+			)
 			.into();
 		}
 
@@ -197,12 +195,9 @@ impl ASTNode {
 		tokens: &[Token],
 	) -> Result<(usize, Self), ParsingError> {
 		// Skip if not an OpenParen
-		match tokens.get(idx) {
-			Some(Token::OpenParen) => {},
-
-			None => return Err(ParsingError::UnexpectedEndOfInput),
-			Some(_) => return Self::parse_primary_expr(idx, tokens),
-		};
+		if tokens.get(idx) != Some(&Token::OpenParen) {
+			return Self::parse_primary_expr(idx, tokens);
+		}
 
 		// Consuming the Open Paren
 		let mut consumed_len = 1;
@@ -241,6 +236,7 @@ impl ASTNode {
 		let kind = match token {
 			Token::Identifier(var_name) => ASTNodeKind::Variable(var_name.clone()),
 			Token::NumericLiteral(n) => ASTNodeKind::Number(*n),
+			Token::OpenBrace => return Self::parse_matrix(idx, tokens),
 
 			token => {
 				return Err(ParsingError::UnexpectedToken {
@@ -259,6 +255,90 @@ impl ASTNode {
 
 		Ok((1, res))
 	}
+
+	fn parse_matrix(idx: usize, tokens: &[Token]) -> Result<(usize, Self), ParsingError> {
+		// Consume the open bracket
+		let mut consumed_len = 1;
+
+		// Check if the matrix is empty
+		if tokens.get(idx + consumed_len) == Some(&Token::CloseBrace) {
+			let mat = vec![];
+
+			let res = Self {
+				kind: ASTNodeKind::Matrix(mat),
+				span: None,
+				store_in_ans: false,
+				print_result: false,
+			};
+
+			consumed_len += 1;
+			return Ok((consumed_len, res));
+		}
+
+		// Parse the first element (to initialize the matrix)
+		let (first_len, first) = Self::parse_expr(idx + consumed_len, tokens)?;
+		consumed_len += first_len;
+
+		let mut mat = vec![vec![first]];
+		let mut i = 0;
+		let mut is_already_comma_seperated = false;
+
+		loop {
+			match tokens.get(idx + consumed_len) {
+				None => return Err(ParsingError::UnexpectedEndOfInput),
+
+				Some(&Token::CloseBrace) => {
+					consumed_len += 1;
+					break;
+				},
+
+				Some(&Token::Comma) => {
+					if is_already_comma_seperated {
+						return Err(ParsingError::EmptyMatrixElement);
+					}
+					is_already_comma_seperated = true;
+					consumed_len += 1;
+				},
+
+				Some(&Token::SemiColon) => {
+					while tokens.get(idx + consumed_len) == Some(&Token::SemiColon) {
+						consumed_len += 1;
+					}
+
+					if i >= 1 {
+						if mat[i - 1].len() != mat[i].len() {
+							return Err(ParsingError::DimensionsMismatch(mat[i - 1].len(), mat[i].len()));
+						}
+					}
+
+					mat.push(vec![]);
+					i += 1;
+				},
+
+				_ => {
+					let (tmp_len, tmp) = Self::parse_expr(idx + consumed_len, tokens)?;
+					mat[i].push(tmp);
+					consumed_len += tmp_len;
+					is_already_comma_seperated = false;
+				}
+			}
+		}
+
+		if i >= 1 {
+			if mat[i - 1].len() != mat[i].len() {
+				return Err(ParsingError::DimensionsMismatch(mat[i - 1].len(), mat[i].len()));
+			}
+		}
+
+		let res = Self {
+			kind: ASTNodeKind::Matrix(mat),
+			span: None,
+			store_in_ans: false,
+			print_result: false,
+		};
+
+		Ok((consumed_len, res))
+	}
 }
 
 ////////////////////////////////
@@ -267,6 +347,8 @@ impl ASTNode {
 
 #[derive(Debug)]
 pub enum ParsingError {
+	EmptyMatrixElement,
+	DimensionsMismatch(usize, usize),
 	UnexpectedEndOfInput,
 	UnexpectedToken {
 		expected: Option<String>,
@@ -278,7 +360,11 @@ impl std::error::Error for ParsingError {}
 impl std::fmt::Display for ParsingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
+			Self::EmptyMatrixElement => write!(f, "Empty matrix elements are not allowed"),
+			Self::DimensionsMismatch(i, j) => write!(f, "Dimensions mismatch ({i} vs {j})"),
+
 			Self::UnexpectedEndOfInput => write!(f, "Unexpected end of input tokens array"),
+
 			Self::UnexpectedToken { expected, found } => {
 				let mut res = String::from("Unexpected token");
 				if let Some(expected) = expected {

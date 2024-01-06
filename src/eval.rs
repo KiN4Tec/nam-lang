@@ -16,6 +16,27 @@ pub fn evaluate(ast: ASTNode, state: &mut State) -> Result<RuntimeVal, Evaluatio
 			Ok(res)
 		},
 
+		ASTNodeKind::Matrix(m) => {
+			let mut res_mat = vec![];
+			for i in m {
+				let mut row = vec![];
+				for j in i {
+					row.push(evaluate(j, state)?);
+				}
+				res_mat.push(row);
+			}
+
+			let res = RuntimeVal::Matrix(res_mat);
+			if ast.store_in_ans {
+				state.assign_var("ans".to_string(), res.clone());
+				if ast.print_result {
+					println!("\nans = {res:?}");
+				}
+			}
+
+			Ok(res)
+		},
+
 		ASTNodeKind::Variable(var_name) => match state.get_var(&var_name) {
 			Some(var_value) => {
 				if ast.print_result {
@@ -38,7 +59,7 @@ pub fn evaluate(ast: ASTNode, state: &mut State) -> Result<RuntimeVal, Evaluatio
 			Ok(res)
 		},
 
-		ASTNodeKind::BinaryExpr { lhs, op, rhs } => {
+		ASTNodeKind::BinaryExpr(op, lhs, rhs) => {
 			let res_lhs: f64 = match evaluate(*lhs, state)? {
 				RuntimeVal::Number(var_value) => var_value,
 				_ => return Err(EvaluationError::NotANumber),
