@@ -7,5 +7,5 @@ edition = "2021"
 publish = false
 
 [dependencies]
-color-eyre = "0.6.2"
-reedline = "0.26.0"
+color-eyre = "0.6.3"
+reedline = "0.31.0"
