@@ -132,39 +132,43 @@ impl std::str::FromStr for Token {
 }
 
 #[allow(dead_code)]
-pub fn tokenize(code: &[char]) -> Vec<Token> {
-	match try_tokenize(code) {
+pub fn tokenize(idx: usize, code: &str) -> Vec<Token> {
+	match try_tokenize(idx, code) {
 		Ok(tokens) => tokens,
 		Err(e) => panic!("{e:?}"),
 	}
 }
 
-pub fn try_tokenize(code: &[char]) -> Result<Vec<Token>, TokenizationError> {
+pub fn try_tokenize(mut idx: usize, code: &str) -> Result<Vec<Token>, TokenizationError> {
+	let mut chars = code.chars().skip(idx).peekable();
 	let mut res = vec![];
-	let mut idx = 0;
 
-	while let Some(first) = code.get(idx) {
+	while let Some(first) = chars.next() {
 		match first {
 			'+' | '-' | '*' | '/' | '(' | ')' | '[' | ']' | '{' | '}' | '=' | ',' | ';' => {
-				res.push(first.to_string().parse()?);
 				idx += 1;
+				res.push(first.to_string().parse()?);
 			},
 
 			'0'..='9' => {
 				let (token_len, token) = try_tokenize_number(idx, code)?;
-				res.push(token);
 				idx += token_len;
+				chars.nth(token_len - 1);
+				res.push(token);
 			},
 
 			'A'..='Z' | 'a'..='z' | '_' => {
-				let mut token = String::new();
-				while let Some(&next) = code.get(idx) {
+				let mut token = first.to_string();
+				idx += 1;
+
+				while let Some(&next) = chars.peek() {
 					if !next.is_ascii_alphanumeric() && next != '_' {
 						break;
 					}
-					token.push(next);
+					token.push(chars.next().unwrap());
 					idx += 1;
 				}
+
 				res.push(token.parse()?);
 			},
 
@@ -175,14 +179,16 @@ pub fn try_tokenize(code: &[char]) -> Result<Vec<Token>, TokenizationError> {
 
 			'\r' => {
 				idx += 1;
-				if code.get(idx) == Some(&'\n') {
+				if chars.peek() == Some(&'\n') {
+					chars.next();
 					idx += 1;
 				}
 				res.push(Token::EndOfLine);
 			},
 
-			_ if first.is_whitespace() => idx += 1,
-			&c => {
+			' ' => idx += 1,
+
+			c => {
 				return Err(TokenizationError {
 					kind: TokenizationErrorKind::UnexpectedChar(c),
 					token_str: None,
@@ -196,21 +202,22 @@ pub fn try_tokenize(code: &[char]) -> Result<Vec<Token>, TokenizationError> {
 	Ok(res)
 }
 
-pub fn try_tokenize_number(idx: usize, code: &[char]) -> Result<(usize, Token), TokenizationError> {
+pub fn try_tokenize_number(idx: usize, code: &str) -> Result<(usize, Token), TokenizationError> {
+	let mut chars = code.chars().skip(idx).peekable();
 	let mut token = String::new();
 	let mut is_frac = false;
 	let mut is_expo = false;
 	let mut token_len = 0;
 
-	while let Some(&next) = code.get(idx + token_len) {
+	while let Some(&next) = chars.peek() {
 		match next {
 			'0'..='9' => {
-				token.push(next);
+				token.push(chars.next().unwrap());
 				token_len += 1;
 			},
 
 			'.' => {
-				token.push('.');
+				token.push(chars.next().unwrap());
 				token_len += 1;
 
 				if is_expo {
@@ -236,8 +243,8 @@ pub fn try_tokenize_number(idx: usize, code: &[char]) -> Result<(usize, Token), 
 				is_frac = true;
 			},
 
-			'e' => {
-				token.push('e');
+			'e' | 'E' => {
+				token.push(chars.next().unwrap());
 				token_len += 1;
 
 				if is_expo {
@@ -253,14 +260,15 @@ pub fn try_tokenize_number(idx: usize, code: &[char]) -> Result<(usize, Token), 
 				is_expo = true;
 				is_frac = true;
 
-				while code.get(idx + token_len) == Some(&'_') {
+				while chars.peek() == Some(&'_') {
+					chars.next();
 					token_len += 1;
 				}
 
-				match code.get(idx + token_len) {
+				match chars.next() {
 					Some('+') => token.push('+'),
 					Some('-') => token.push('-'),
-					Some(&n) if n.is_ascii_digit() => token.push(n),
+					Some(n) if n.is_ascii_digit() => token.push(n),
 					None | Some(_) => {
 						return Err(TokenizationError {
 							kind: TokenizationErrorKind::UnexpectedChar('e'),
@@ -271,13 +279,14 @@ pub fn try_tokenize_number(idx: usize, code: &[char]) -> Result<(usize, Token), 
 						})
 					},
 				}
+
 				token_len += 1;
 			},
 
 			'A'..='Z' | 'a'..='z' => {
 				token.push(next);
 				return Err(TokenizationError {
-					kind: TokenizationErrorKind::UnspportedSyntax(next.to_string()),
+					kind: TokenizationErrorKind::UnspportedSyntax(chars.next().unwrap().to_string()),
 					token_str: Some(token),
 					message: Some(String::from(
 						"Suffixes other than 'e' are not supported.",
@@ -285,7 +294,11 @@ pub fn try_tokenize_number(idx: usize, code: &[char]) -> Result<(usize, Token), 
 				});
 			},
 
-			'_' => {},
+			'_' => {
+				chars.next();
+				token_len += 1;
+			},
+
 			_ => break,
 		}
 	}

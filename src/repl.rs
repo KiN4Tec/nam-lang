@@ -53,11 +53,7 @@ impl Repl {
 			return Ok(());
 		}
 
-		// Unfortunately, at the time of writing, Rust does not seem to support direct conversion
-		// from a String to an array of characters, once it have it, this should be changed.
-		let code: Vec<char> = input.chars().collect();
-
-		let tokens = lexer::try_tokenize(code.as_ref())?;
+		let tokens = lexer::try_tokenize(0, input.as_str())?;
 		let ast = ast::ASTNode::try_from(&tokens)?;
 		eval::evaluate(ast, &mut self.state)?;
 
