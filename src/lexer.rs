@@ -18,8 +18,8 @@ pub enum Token {
 	NumericLiteral(f64),
 	Identifier(String),
 
-	Comma,      // ,
-	SemiColon,  // ;
+	Comma,     // ,
+	SemiColon, // ;
 	EndOfLine,
 	EndOfFile,
 }
@@ -163,15 +163,15 @@ pub fn try_tokenize(mut idx: usize, code: &str) -> Result<Vec<Token>, Tokenizati
 
 			'0'..='9' => {
 				let (token_len, token) = try_tokenize_number(idx, code)?;
-res.push(token);
+				res.push(token);
 
 				idx += token_len;
 				chars.nth(token_len - 1);
-							},
+			},
 
 			'A'..='Z' | 'a'..='z' | '_' => {
-								idx += 1;
-let mut token = chars.next().unwrap().to_string();
+				idx += 1;
+				let mut token = chars.next().unwrap().to_string();
 
 				while let Some(&next) = chars.peek() {
 					if !next.is_ascii_alphanumeric() && next != '_' {
@@ -180,13 +180,13 @@ let mut token = chars.next().unwrap().to_string();
 
 					idx += 1;
 					token.push(chars.next().unwrap());
-									}
+				}
 
 				res.push(token.parse()?);
 			},
 
 			'\n' => {
-								res.push(Token::EndOfLine);
+				res.push(Token::EndOfLine);
 
 				idx += 1;
 				chars.next();
@@ -194,7 +194,7 @@ let mut token = chars.next().unwrap().to_string();
 
 			'\r' => {
 				idx += 1;
-chars.next();
+				chars.next();
 
 				if chars.peek() == Some(&'\n') {
 					chars.next();
@@ -294,9 +294,7 @@ pub fn try_tokenize_number(idx: usize, code: &str) -> Result<(usize, Token), Tok
 						return Err(TokenizationError {
 							kind: TokenizationErrorKind::UnexpectedChar('e'),
 							token_str: Some(token),
-							message: Some(String::from(
-								"The scientific notation is not complete.",
-							)),
+							message: Some(String::from("The scientific notation is not complete.")),
 						})
 					},
 				}
@@ -307,11 +305,11 @@ pub fn try_tokenize_number(idx: usize, code: &str) -> Result<(usize, Token), Tok
 			'A'..='Z' | 'a'..='z' => {
 				token.push(next);
 				return Err(TokenizationError {
-					kind: TokenizationErrorKind::UnspportedSyntax(chars.next().unwrap().to_string()),
+					kind: TokenizationErrorKind::UnspportedSyntax(
+						chars.next().unwrap().to_string(),
+					),
 					token_str: Some(token),
-					message: Some(String::from(
-						"Suffixes other than 'e' are not supported.",
-					)),
+					message: Some(String::from("Suffixes other than 'e' are not supported.")),
 				});
 			},
 

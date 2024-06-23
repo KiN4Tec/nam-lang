@@ -20,11 +20,7 @@ pub enum ASTNodeKind {
 
 	Assignment(String, Box<ASTNode>),
 
-	BinaryExpr (
-		BinaryOpKind,
-		Box<ASTNode>,
-		Box<ASTNode>,
-	),
+	BinaryExpr(BinaryOpKind, Box<ASTNode>, Box<ASTNode>),
 }
 
 #[derive(Debug)]
@@ -154,12 +150,7 @@ impl ASTNode {
 			let (consumed_rhs, rhs) = Self::parse_multiplicative_expr(idx + consumed_len, tokens)?;
 			consumed_len += consumed_rhs;
 
-			lhs = ASTNodeKind::BinaryExpr (
-				token.try_into()?,
-				Box::new(lhs),
-				Box::new(rhs),
-			)
-			.into();
+			lhs = ASTNodeKind::BinaryExpr(token.try_into()?, Box::new(lhs), Box::new(rhs)).into();
 		}
 
 		Ok((consumed_len, lhs))
@@ -181,12 +172,7 @@ impl ASTNode {
 			let (consumed_rhs, rhs) = Self::parse_parenthesised_expr(idx + consumed_len, tokens)?;
 			consumed_len += consumed_rhs;
 
-			lhs = ASTNodeKind::BinaryExpr (
-				token.try_into()?,
-				Box::new(lhs),
-				Box::new(rhs),
-			)
-			.into();
+			lhs = ASTNodeKind::BinaryExpr(token.try_into()?, Box::new(lhs), Box::new(rhs)).into();
 		}
 
 		Ok((consumed_len, lhs))
@@ -307,10 +293,11 @@ impl ASTNode {
 						consumed_len += 1;
 					}
 
-					if i >= 1 {
-						if mat[i - 1].len() != mat[i].len() {
-							return Err(ParsingError::DimensionsMismatch(mat[i - 1].len(), mat[i].len()));
-						}
+					if i >= 1 && mat[i - 1].len() != mat[i].len() {
+						return Err(ParsingError::DimensionsMismatch(
+							mat[i - 1].len(),
+							mat[i].len(),
+						));
 					}
 
 					mat.push(vec![]);
@@ -322,14 +309,15 @@ impl ASTNode {
 					mat[i].push(tmp);
 					consumed_len += tmp_len;
 					is_already_comma_seperated = false;
-				}
+				},
 			}
 		}
 
-		if i >= 1 {
-			if mat[i - 1].len() != mat[i].len() {
-				return Err(ParsingError::DimensionsMismatch(mat[i - 1].len(), mat[i].len()));
-			}
+		if i >= 1 && mat[i - 1].len() != mat[i].len() {
+			return Err(ParsingError::DimensionsMismatch(
+				mat[i - 1].len(),
+				mat[i].len(),
+			));
 		}
 
 		let res = Self {
