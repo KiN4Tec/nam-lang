@@ -143,52 +143,73 @@ pub fn try_tokenize(mut idx: usize, code: &str) -> Result<Vec<Token>, Tokenizati
 	let mut chars = code.chars().skip(idx).peekable();
 	let mut res = vec![];
 
-	while let Some(first) = chars.next() {
+	/*
+		Rust borrow checker dows not allow us to use these closures
+		because they borrow idx and chars untill the last call of these closures
+
+		let mut advance = |i: usize| {
+			idx += i;
+			chars.nth(i - 1);
+		};
+		let mut advance_once = || advance(1);
+	*/
+
+	while let Some(first) = chars.peek() {
 		match first {
 			'+' | '-' | '*' | '/' | '(' | ')' | '[' | ']' | '{' | '}' | '=' | ',' | ';' => {
 				idx += 1;
-				res.push(first.to_string().parse()?);
+				res.push(chars.next().unwrap().to_string().parse()?);
 			},
 
 			'0'..='9' => {
 				let (token_len, token) = try_tokenize_number(idx, code)?;
+res.push(token);
+
 				idx += token_len;
 				chars.nth(token_len - 1);
-				res.push(token);
-			},
+							},
 
 			'A'..='Z' | 'a'..='z' | '_' => {
-				let mut token = first.to_string();
-				idx += 1;
+								idx += 1;
+let mut token = chars.next().unwrap().to_string();
 
 				while let Some(&next) = chars.peek() {
 					if !next.is_ascii_alphanumeric() && next != '_' {
 						break;
 					}
-					token.push(chars.next().unwrap());
+
 					idx += 1;
-				}
+					token.push(chars.next().unwrap());
+									}
 
 				res.push(token.parse()?);
 			},
 
 			'\n' => {
+								res.push(Token::EndOfLine);
+
 				idx += 1;
-				res.push(Token::EndOfLine);
+				chars.next();
 			},
 
 			'\r' => {
 				idx += 1;
+chars.next();
+
 				if chars.peek() == Some(&'\n') {
 					chars.next();
 					idx += 1;
 				}
+
 				res.push(Token::EndOfLine);
 			},
 
-			' ' => idx += 1,
+			' ' => {
+				idx += 1;
+				chars.next();
+			},
 
-			c => {
+			&c => {
 				return Err(TokenizationError {
 					kind: TokenizationErrorKind::UnexpectedChar(c),
 					token_str: None,
