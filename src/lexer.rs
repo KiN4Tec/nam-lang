@@ -131,7 +131,7 @@ impl std::str::FromStr for Token {
 	}
 }
 
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn tokenize(idx: usize, code: &str) -> Vec<Token> {
 	match try_tokenize(idx, code) {
 		Ok(tokens) => tokens,

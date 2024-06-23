@@ -5,9 +5,11 @@ use reedline::Span;
 #[derive(Debug)]
 pub struct ASTNode {
 	pub kind: ASTNodeKind,
-	pub span: Option<Span>,
 	pub store_in_ans: bool,
 	pub print_result: bool,
+
+	#[allow(unused)]
+	pub span: Option<Span>,
 }
 
 #[derive(Debug)]
