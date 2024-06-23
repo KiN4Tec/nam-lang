@@ -8,4 +8,4 @@ publish = false
 
 [dependencies]
 color-eyre = "0.6.3"
-reedline = "0.31.0"
+reedline = "0.32.0"
