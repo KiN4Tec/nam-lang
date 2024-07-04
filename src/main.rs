@@ -1,10 +1,13 @@
 mod repl;
-mod state;
 
 mod ast;
-mod eval;
-mod lexer;
+mod token;
 
+mod engine;
+mod lexer;
+mod parser;
+
+mod errors;
 use color_eyre::eyre::Result;
 
 fn main() -> Result<()> {

@@ -1,19 +1,21 @@
 use {
-	crate::{ast, eval, lexer, state::State},
+	crate::{
+		engine::Engine, errors::TokenizationError, lexer::Lexer, parser::Parser, token::Token,
+	},
 	color_eyre::eyre::Result,
 	reedline::Signal,
 };
 
 pub struct Repl {
 	pub is_running: bool,
-	pub state: State,
+	pub engine: Engine,
 }
 
 impl Repl {
 	pub fn new() -> Self {
 		Repl {
 			is_running: false,
-			state: State::new(),
+			engine: Engine::new(),
 		}
 	}
 
@@ -53,9 +55,10 @@ impl Repl {
 			return Ok(());
 		}
 
-		let tokens = lexer::try_tokenize(0, input.as_str())?;
-		let ast = ast::ASTNode::try_from(&tokens)?;
-		eval::evaluate(ast, &mut self.state)?;
+		let lexer = Lexer::new(input.chars().collect());
+		let tokens = lexer.collect::<Result<Vec<Token>, TokenizationError>>()?;
+		let mut parser = Parser::new(&tokens);
+		self.engine.evaluate(parser.parse()?)?;
 
 		Ok(())
 	}
