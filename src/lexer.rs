@@ -69,7 +69,7 @@ impl Iterator for Lexer {
 				let e =
 					TokenizationError::new(TokenizationErrorKind::UnexpectedChar(c), None, None);
 				self.last_error = Some(e.clone());
-				return Some(Err(e));
+				Some(Err(e))
 			},
 		}
 	}

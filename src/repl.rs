@@ -7,8 +7,8 @@ use {
 };
 
 pub struct Repl {
-	pub is_running: bool,
-	pub engine: Engine,
+	is_running: bool,
+	engine: Engine,
 }
 
 impl Repl {
@@ -65,7 +65,7 @@ impl Repl {
 }
 
 #[derive(Default)]
-pub struct Prompt {}
+struct Prompt {}
 
 impl reedline::Prompt for Prompt {
 	fn render_prompt_left(&self) -> std::borrow::Cow<str> {
