@@ -176,54 +176,44 @@ impl Parser {
 
 		let first = self.parse_expr()?;
 
-		let mut mat = vec![vec![first]];
-		let mut i = 0;
-		let mut is_already_comma_seperated = false;
+		let mut mat = Vec::new();
+		let mut row = Vec::new();
+		row.push(first);
 
 		loop {
 			match self.get() {
 				None => return Err(ParsingError::UnexpectedEndOfInput),
 
 				Some(&Token::CloseBracket) => {
+					if !row.is_empty() {
+						mat.push(row);
+					}
 					self.advance();
 					break;
 				},
 
 				Some(&Token::Comma) => {
-					if is_already_comma_seperated {
-						return Err(ParsingError::EmptyMatrixElement);
-					}
-					is_already_comma_seperated = true;
 					self.advance();
 				},
 
 				Some(&Token::SemiColon) => {
-					if i >= 1 && mat[i - 1].len() != mat[i].len() {
-						return Err(ParsingError::DimensionsMismatch(
-							mat[i - 1].len(),
-							mat[i].len(),
-						));
+					if row.is_empty() {
+						self.advance();
+						continue;
 					}
 
-					mat.push(vec![]);
-					i += 1;
+					let cap = row.len();
+					mat.push(row);
+					row = Vec::with_capacity(cap);
 
 					self.advance();
 				},
 
 				_ => {
 					let expr = self.parse_expr()?;
-					mat[i].push(expr);
-					is_already_comma_seperated = false;
+					row.push(expr);
 				},
 			}
-		}
-
-		if i >= 1 && mat[i - 1].len() != mat[i].len() {
-			return Err(ParsingError::DimensionsMismatch(
-				mat[i - 1].len(),
-				mat[i].len(),
-			));
 		}
 
 		let res = ASTNode {

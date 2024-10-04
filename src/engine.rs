@@ -3,6 +3,7 @@ use crate::{
 	errors::EvaluationError,
 	runtime::RuntimeVal,
 };
+use nalgebra::{dmatrix, DMatrix, RowDVector};
 use std::collections::HashMap;
 
 pub struct Engine {
@@ -39,17 +40,38 @@ impl Engine {
 				Ok(res)
 			},
 
-			ASTNodeKind::Matrix(m) => {
-				let mut res_mat = vec![];
-				for i in m {
-					let mut row = vec![];
-					for j in i {
-						row.push(self.evaluate(j)?);
-					}
-					res_mat.push(row);
-				}
+			ASTNodeKind::Matrix(mat) => {
+				let res = if mat.is_empty() {
+					RuntimeVal::Matrix(dmatrix![])
+				} else {
+					let width = mat[0].len();
+					let height = mat.len();
+					let mut res_mat = Vec::with_capacity(mat.len());
 
-				let res = RuntimeVal::Matrix(res_mat);
+					for row in mat {
+						if width != row.len() {
+							return Err(EvaluationError::InconsistantMatrixWidth(width, row.len()));
+						}
+
+						let mut res_row = Vec::with_capacity(width);
+						for cell in row {
+							match self.evaluate(cell)? {
+								RuntimeVal::Number(res_cell) => res_row.push(res_cell),
+								RuntimeVal::Matrix(_) => {
+									return Err(EvaluationError::NestedMatrices)
+								},
+							}
+						}
+						res_mat.push(RowDVector::from_row_slice(res_row.as_slice()));
+					}
+
+					if width == 1 && height == 1 {
+						RuntimeVal::Number(res_mat[0][0])
+					} else {
+						RuntimeVal::Matrix(DMatrix::from_rows(&res_mat))
+					}
+				};
+
 				if ast.store_in_ans {
 					self.assign_var("ans".to_string(), res.clone());
 					if ast.print_result {
@@ -83,21 +105,14 @@ impl Engine {
 			},
 
 			ASTNodeKind::BinaryExpr(op, lhs, rhs) => {
-				let res_lhs: f64 = match self.evaluate(*lhs)? {
-					RuntimeVal::Number(var_value) => var_value,
-					_ => return Err(EvaluationError::NotANumber),
-				};
-
-				let res_rhs: f64 = match self.evaluate(*rhs)? {
-					RuntimeVal::Number(var_value) => var_value,
-					_ => return Err(EvaluationError::NotANumber),
-				};
+				let res_lhs = self.evaluate(*lhs)?;
+				let res_rhs = self.evaluate(*rhs)?;
 
 				let res = match op {
-					BinaryOpKind::Add => RuntimeVal::Number(res_lhs + res_rhs),
-					BinaryOpKind::Subtract => RuntimeVal::Number(res_lhs - res_rhs),
-					BinaryOpKind::Multiply => RuntimeVal::Number(res_lhs * res_rhs),
-					BinaryOpKind::Divide => RuntimeVal::Number(res_lhs / res_rhs),
+					BinaryOpKind::Add => res_lhs.try_add(res_rhs)?,
+					BinaryOpKind::Subtract => res_lhs.try_sub(res_rhs)?,
+					BinaryOpKind::Multiply => res_lhs.try_mul(res_rhs)?,
+					BinaryOpKind::Divide => res_lhs.try_div(res_rhs)?,
 				};
 
 				if ast.store_in_ans {

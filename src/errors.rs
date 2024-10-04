@@ -56,8 +56,6 @@ impl std::fmt::Display for TokenizationError {
 
 #[derive(Debug, Clone)]
 pub enum ParsingError {
-	EmptyMatrixElement,
-	DimensionsMismatch(usize, usize),
 	UnexpectedEndOfInput,
 	UnexpectedToken {
 		expected: Option<String>,
@@ -69,9 +67,6 @@ impl std::error::Error for ParsingError {}
 impl std::fmt::Display for ParsingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::EmptyMatrixElement => write!(f, "Empty matrix elements are not allowed"),
-			Self::DimensionsMismatch(i, j) => write!(f, "Dimensions mismatch ({i} vs {j})"),
-
 			Self::UnexpectedEndOfInput => write!(f, "Unexpected end of input tokens array"),
 
 			Self::UnexpectedToken { expected, found } => {
@@ -91,7 +86,10 @@ impl std::fmt::Display for ParsingError {
 #[derive(Debug, Clone)]
 pub enum EvaluationError {
 	NonexistantVar(String),
-	NotANumber,
+	NestedMatrices,
+	InconsistantMatrixWidth(usize, usize),
+	DimensionsMismatch((usize, usize), (usize, usize)),
+	NoninvertibleDivisorMatrix,
 }
 
 impl std::error::Error for EvaluationError {}
@@ -99,7 +97,24 @@ impl std::fmt::Display for EvaluationError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::NonexistantVar(var_name) => write!(f, "Variable {var_name} does not exist"),
-			Self::NotANumber => write!(f, "Some value was used as a number while it is not"),
+			Self::NoninvertibleDivisorMatrix => write!(f, "Can't divide by a non-invertible matrix"),
+
+			EvaluationError::NestedMatrices => write!(
+				f,
+				"Matrices with more than two dimensions are not supported, yet!"
+			),
+
+			Self::InconsistantMatrixWidth(i, j) => {
+				write!(f, "Inconsistant Matrix Width ({i} vs {j})")
+			},
+
+			EvaluationError::DimensionsMismatch(
+				(lhs_width, lhs_height),
+				(rhs_width, rhs_height),
+			) => write!(
+				f,
+				"Dimentions Mismatch ({lhs_width}x{lhs_height} vs {rhs_width}x{rhs_height})"
+			),
 		}
 	}
 }
