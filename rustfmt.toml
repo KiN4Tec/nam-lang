@@ -1,8 +1,11 @@
-edition = "2021"
-
 hard_tabs = true
 newline_style = "Unix"
 
+# group_imports = "StdExternalCrate" # Unstable
+reorder_imports = true # Default
+reorder_modules = false
+
+# brace_style = "AlwaysNextLine" # Unstable
 match_arm_leading_pipes = "Never"    # Default
 match_block_trailing_comma = true
 use_field_init_shorthand = true

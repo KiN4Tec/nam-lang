@@ -1,12 +1,12 @@
 mod repl;
 
+mod token;
 mod ast;
 mod runtime;
-mod token;
 
-mod engine;
 mod lexer;
 mod parser;
+mod engine;
 
 mod errors;
 use color_eyre::eyre::Result;
