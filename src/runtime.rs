@@ -83,7 +83,15 @@ impl RuntimeVal {
 			(Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs / rhs)),
 
 			(Self::Matrix(lhs), Self::Matrix(rhs)) => {
-				if let Some(inv_rhs) = rhs.clone().try_inverse() {
+				if !rhs.is_square() {
+					return Err(EvaluationError::NoninvertibleDivisorMatrix);
+				}
+
+				if lhs.shape() != rhs.shape() {
+					return Err(EvaluationError::DimensionsMismatch(lhs.shape(), rhs.shape()));
+				}
+
+				if let Some(inv_rhs) = rhs.try_inverse() {
 					Ok(Self::Matrix(lhs * inv_rhs))
 				} else {
 					Err(EvaluationError::NoninvertibleDivisorMatrix)
