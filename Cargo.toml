@@ -3,7 +3,7 @@ name = "nam"
 authors = ["Mouhammed Nashat Helmi <Nashat.Helmi+Nam@Gmail.com>"]
 license = "MIT"
 version = "0.4.0-alpha"
-edition = "2021"
+edition = "2024"
 publish = false
 
 [dependencies]
