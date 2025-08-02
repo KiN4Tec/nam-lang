@@ -56,7 +56,11 @@ impl std::fmt::Display for TokenizationError {
 
 #[derive(Debug, Clone)]
 pub enum ParsingError {
+	UnmatchedOpenParen,
+	UnmatchedCloseParen,
 	UnexpectedEndOfInput,
+	IncompleteStatement,
+	InvalidArithmaticExpression,
 	UnexpectedToken {
 		expected: Option<String>,
 		found: Option<String>,
@@ -67,8 +71,11 @@ impl std::error::Error for ParsingError {}
 impl std::fmt::Display for ParsingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
+			Self::UnmatchedOpenParen => write!(f, "Unmatched opening parenthesis"),
+			Self::UnmatchedCloseParen => write!(f, "Unmatched closing parenthesis"),
 			Self::UnexpectedEndOfInput => write!(f, "Unexpected end of input tokens array"),
-
+			Self::IncompleteStatement => write!(f, "Incomplete Statement"),
+			Self::InvalidArithmaticExpression => write!(f, "Invalid Arithmatic Expression"),
 			Self::UnexpectedToken { expected, found } => {
 				let mut res = String::from("Unexpected token");
 				if let Some(expected) = expected {
@@ -90,6 +97,8 @@ pub enum EvaluationError {
 	InconsistantMatrixWidth(usize, usize),
 	DimensionsMismatch((usize, usize), (usize, usize)),
 	NoninvertibleDivisorMatrix,
+	InvalidArithmaticExpression,
+	AssignmentToNonVariable,
 }
 
 impl std::error::Error for EvaluationError {}
@@ -97,18 +106,23 @@ impl std::fmt::Display for EvaluationError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::NonexistantVar(var_name) => write!(f, "Variable {var_name} does not exist"),
+			Self::InvalidArithmaticExpression => write!(f, "Invalid Arithmatic Expression"),
 			Self::NoninvertibleDivisorMatrix => {
 				write!(f, "Can't divide by a non-invertible matrix")
+			},
+
+			Self::InconsistantMatrixWidth(i, j) => {
+				write!(f, "Inconsistant Matrix Width ({i} vs {j})")
+			},
+
+			Self::AssignmentToNonVariable => {
+				write!(f, "Can't assign to something other than a variable")
 			},
 
 			EvaluationError::NestedMatrices => write!(
 				f,
 				"Matrices with more than two dimensions are not supported, yet!"
 			),
-
-			Self::InconsistantMatrixWidth(i, j) => {
-				write!(f, "Inconsistant Matrix Width ({i} vs {j})")
-			},
 
 			EvaluationError::DimensionsMismatch(
 				(lhs_width, lhs_height),

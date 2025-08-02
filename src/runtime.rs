@@ -3,6 +3,7 @@ use nalgebra::DMatrix;
 
 #[derive(Debug, Clone)]
 pub enum RuntimeVal {
+	Variable(String),
 	Number(f64),
 	Matrix(DMatrix<f64>),
 }
@@ -26,6 +27,8 @@ impl RuntimeVal {
 			(Self::Matrix(mat), Self::Number(num)) | (Self::Number(num), Self::Matrix(mat)) => {
 				Ok(RuntimeVal::Matrix(mat.add_scalar(num)))
 			},
+
+			_ => unreachable!("Variables must be evaluated in the engine first"),
 		}
 	}
 
@@ -50,6 +53,8 @@ impl RuntimeVal {
 				mat.neg_mut();
 				Ok(RuntimeVal::Matrix(mat.add_scalar(num)))
 			},
+
+			_ => unreachable!("Variables must be evaluated in the engine first"),
 		}
 	}
 
@@ -75,6 +80,8 @@ impl RuntimeVal {
 				}
 				Ok(Self::Matrix(mat))
 			},
+
+			_ => unreachable!("Variables must be evaluated in the engine first"),
 		}
 	}
 
@@ -108,6 +115,8 @@ impl RuntimeVal {
 			(Self::Number(_num), Self::Matrix(mat)) => {
 				Err(EvaluationError::DimensionsMismatch((1, 1), mat.shape()))
 			},
+
+			_ => unreachable!("Variables must be evaluated in the engine first"),
 		}
 	}
 }
@@ -117,6 +126,7 @@ impl std::fmt::Display for RuntimeVal {
 		match self {
 			Self::Number(n) => write!(f, "{n}"),
 			Self::Matrix(mat) => write!(f, "{mat}"),
+			Self::Variable(name) => write!(f, "{name}"),
 		}
 	}
 }

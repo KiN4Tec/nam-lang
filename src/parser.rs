@@ -1,5 +1,5 @@
 use crate::{
-	ast::{ASTNode, ASTNodeKind},
+	ast::{ASTNode, ASTNodeValue, Operator},
 	errors::ParsingError,
 	token::Token,
 };
@@ -7,6 +7,7 @@ use crate::{
 pub struct Parser {
 	idx: usize,
 	tokens: Box<[Token]>,
+	is_inside_matrix: bool,
 }
 
 impl Parser {
@@ -14,16 +15,21 @@ impl Parser {
 		Self {
 			idx: 0,
 			tokens: tokens.into(),
+			is_inside_matrix: false,
 		}
 	}
 
-	fn get(&mut self) -> Option<&Token> {
+	fn current(&mut self) -> Option<&Token> {
 		self.tokens.get(self.idx)
 	}
 
-	fn advance(&mut self) -> Option<&Token> {
+	fn next(&mut self) -> Option<&Token> {
 		self.idx += 1;
-		self.tokens.get(self.idx - 1)
+		self.tokens.get(self.idx)
+	}
+
+	fn advance(&mut self) {
+		self.idx += 1;
 	}
 
 	pub fn parse(&mut self) -> Result<ASTNode, ParsingError> {
@@ -33,8 +39,8 @@ impl Parser {
 	fn parse_stmt(&mut self) -> Result<ASTNode, ParsingError> {
 		let mut res = self.parse_expr()?;
 
-		match self.advance() {
-			None | Some(Token::EndOfFile) | Some(Token::EndOfLine) => {
+		match self.current() {
+			Some(Token::EndOfFile) | Some(Token::EndOfLine) => {
 				res.print_result = true;
 			},
 
@@ -46,182 +52,235 @@ impl Parser {
 				return Err(ParsingError::UnexpectedToken {
 					expected: Some(Token::EndOfFile.stringify()),
 					found: Some(token.stringify()),
-				})
+				});
+			},
+
+			None => {
+				res.print_result = true;
+				unreachable!("We've somehow passed the EOF token at the end of the tokens array");
 			},
 		}
 
-		res.store_in_ans = match res.kind {
-			ASTNodeKind::Number(_) => true,
-			ASTNodeKind::Matrix(_) => true,
-			ASTNodeKind::BinaryExpr(_, _, _) => true,
+		res.store_in_ans = match res.value {
+			ASTNodeValue::Number(_) => true,
+			ASTNodeValue::Matrix(_) => true,
 
-			ASTNodeKind::Variable(_) => false,
-			ASTNodeKind::Assignment(_, _) => false,
+			ASTNodeValue::ArithmaticExpr(ref expr) => {
+				!expr.contains(&ASTNodeValue::Operator(Operator::Assign))
+			},
+
+			ASTNodeValue::Variable(_) => false,
+
+			ASTNodeValue::Operator(op) => {
+				return Err(ParsingError::UnexpectedToken {
+					expected: None,
+					found: Some(op.tokenize().stringify()),
+				});
+			},
 		};
 
 		Ok(res)
 	}
 
 	fn parse_expr(&mut self) -> Result<ASTNode, ParsingError> {
-		self.parse_assignment_expr()
+		self.parse_arithmatic_expr()
 	}
 
-	fn parse_assignment_expr(&mut self) -> Result<ASTNode, ParsingError> {
-		let primary = self.parse_additive_expr()?;
+	fn parse_arithmatic_expr(&mut self) -> Result<ASTNode, ParsingError> {
+		let mut temp: Vec<Token> = vec![];
+		let mut res: Vec<ASTNodeValue> = vec![];
+		let mut precedence_stack = vec![];
+		let mut last_precedence = 0; // The precedence of the last element in the temp stack
+		let mut last_was_operand = false;
 
-		// Assignment Statement (x = 5)
-		if let ASTNodeKind::Variable(lhs) = &primary.kind {
-			if self.get() == Some(&Token::Equal) {
-				self.advance();
-				let rhs = self.parse_expr()?;
-				return Ok(ASTNodeKind::Assignment(lhs.to_string(), Box::new(rhs)).into());
+		while let Some(token) = self.current() {
+			match token {
+				Token::NumericLiteral(n) => {
+					if last_was_operand {
+						if self.is_inside_matrix {
+							break;
+						}
+						return Err(ParsingError::InvalidArithmaticExpression);
+					}
+
+					res.push(ASTNodeValue::Number(*n));
+					self.advance();
+
+					last_was_operand = true;
+				},
+
+				Token::Identifier(var_name) => {
+					if last_was_operand {
+						if self.is_inside_matrix {
+							break;
+						}
+						return Err(ParsingError::InvalidArithmaticExpression);
+					}
+
+					res.push(ASTNodeValue::Variable(var_name.clone()));
+					self.advance();
+
+					last_was_operand = true;
+				},
+
+				Token::OpenBracket => {
+					if last_was_operand {
+						if self.is_inside_matrix {
+							break;
+						}
+						return Err(ParsingError::InvalidArithmaticExpression);
+					}
+
+					res.push(self.parse_matrix()?);
+
+					last_was_operand = true;
+				},
+
+				Token::Plus | Token::Minus | Token::Asterisk | Token::Slash | Token::Equal => {
+					if !last_was_operand {
+						return Err(ParsingError::InvalidArithmaticExpression);
+					}
+
+					let precedence = Operator::try_from(token.clone())?.precedence();
+
+					while precedence < last_precedence {
+						res.push(ASTNodeValue::Operator(Operator::try_from(
+							temp.pop().unwrap(), // Unwrapping because loop will break on None
+						)?));
+
+						// Start of next loop
+						last_precedence = match temp.last() {
+							Some(Token::OpenParen) => 0, // loop will break automatically, so OpenParen should never get poped here
+							Some(o) => Operator::try_from(o.clone())?.precedence(),
+							None => 0, // Unwrapping should be safe because of this
+						}
+					}
+
+					last_precedence = precedence;
+					temp.push(token.clone());
+					self.advance();
+
+					last_was_operand = false;
+				},
+
+				Token::OpenParen => {
+					if last_was_operand {
+						if self.is_inside_matrix {
+							break;
+						}
+						return Err(ParsingError::InvalidArithmaticExpression);
+					}
+
+					temp.push(Token::OpenParen);
+					precedence_stack.push(last_precedence);
+					last_precedence = 0;
+					self.advance();
+
+					last_was_operand = false;
+				},
+
+				Token::CloseParen => {
+					if !last_was_operand {
+						return Err(ParsingError::InvalidArithmaticExpression);
+					}
+
+					loop {
+						let last = match temp.pop() {
+							Some(t) => t,
+							None => return Err(ParsingError::UnmatchedCloseParen),
+						};
+
+						if last == Token::OpenParen {
+							last_precedence = precedence_stack.pop().unwrap();
+							break;
+						}
+
+						res.push(ASTNodeValue::Operator(Operator::try_from(last)?));
+					}
+
+					self.advance();
+
+					last_was_operand = true;
+				},
+
+				_ => break,
+			};
+		}
+
+		if res.is_empty() {
+			return Err(ParsingError::UnexpectedEndOfInput);
+		}
+
+		while let Some(token) = temp.pop() {
+			if token == Token::OpenParen {
+				return Err(ParsingError::UnmatchedOpenParen);
 			}
+			res.push(ASTNodeValue::Operator(Operator::try_from(token)?));
 		}
 
-		Ok(primary)
-	}
-
-	fn parse_additive_expr(&mut self) -> Result<ASTNode, ParsingError> {
-		let mut lhs = self.parse_multiplicative_expr()?;
-
-		while let Some(token) = self.get() {
-			if token != &Token::Plus && token != &Token::Minus {
-				break;
-			}
-			let token = self.advance().cloned().unwrap();
-			let rhs = self.parse_multiplicative_expr()?;
-			lhs = ASTNodeKind::BinaryExpr(token.try_into()?, Box::new(lhs), Box::new(rhs)).into();
-		}
-
-		Ok(lhs)
-	}
-
-	fn parse_multiplicative_expr(&mut self) -> Result<ASTNode, ParsingError> {
-		let mut lhs = self.parse_parenthesised_expr()?;
-
-		while let Some(token) = self.get() {
-			if token != &Token::Asterisk && token != &Token::Slash {
-				break;
-			}
-			let token = self.advance().cloned().unwrap();
-			let rhs = self.parse_parenthesised_expr()?;
-			lhs = ASTNodeKind::BinaryExpr(token.try_into()?, Box::new(lhs), Box::new(rhs)).into();
-		}
-
-		Ok(lhs)
-	}
-
-	fn parse_parenthesised_expr(&mut self) -> Result<ASTNode, ParsingError> {
-		if self.get() != Some(&Token::OpenParen) {
-			return self.parse_primary_expr();
-		}
-
-		self.advance();
-		let result = self.parse_expr()?;
-
-		match self.advance() {
-			Some(Token::CloseParen) => {},
-
-			None => return Err(ParsingError::UnexpectedEndOfInput),
-			Some(t) => {
-				return Err(ParsingError::UnexpectedToken {
-					expected: Some(Token::CloseParen.stringify()),
-					found: Some(t.stringify()),
-				})
-			},
-		}
-
-		Ok(result)
-	}
-
-	fn parse_primary_expr(&mut self) -> Result<ASTNode, ParsingError> {
-		let token = match self.advance().cloned() {
-			Some(token) => token,
-			None => {
-				return Err(ParsingError::UnexpectedEndOfInput);
-			},
-		};
-
-		let kind = match token {
-			Token::Identifier(var_name) => ASTNodeKind::Variable(var_name.clone()),
-			Token::NumericLiteral(n) => ASTNodeKind::Number(n),
-			Token::OpenBracket => return self.parse_matrix(),
-
-			token => {
-				return Err(ParsingError::UnexpectedToken {
-					expected: Some("Expression".to_string()),
-					found: Some(token.stringify()),
-				})
-			},
-		};
-
-		let res = ASTNode::from(kind);
-
-		Ok(res)
-	}
-
-	fn parse_matrix(&mut self) -> Result<ASTNode, ParsingError> {
-		if self.get() == Some(&Token::CloseBracket) {
-			let mat = vec![];
-
-			let res = ASTNode {
-				kind: ASTNodeKind::Matrix(mat),
+		if res.len() == 1 {
+			Ok(ASTNode {
+				value: res[0].clone(),
 				store_in_ans: false,
 				print_result: false,
-			};
+			})
+		} else {
+			res.reverse();
+			Ok(ASTNode {
+				value: ASTNodeValue::ArithmaticExpr(res),
+				store_in_ans: false,
+				print_result: false,
+			})
+		}
+	}
 
+	fn parse_matrix(&mut self) -> Result<ASTNodeValue, ParsingError> {
+		assert_eq!(self.current(), Some(&Token::OpenBracket));
+		if self.next() == Some(&Token::CloseBracket) {
 			self.advance();
-			return Ok(res);
+			return Ok(ASTNodeValue::Matrix(vec![]));
 		}
 
+		self.is_inside_matrix = true;
 		let first = self.parse_expr()?;
 
 		let mut mat = Vec::new();
-		let mut row = Vec::new();
-		row.push(first);
+		let mut row = vec![first];
 
-		loop {
-			match self.get() {
-				None => return Err(ParsingError::UnexpectedEndOfInput),
-
-				Some(&Token::CloseBracket) => {
-					if !row.is_empty() {
-						mat.push(row);
-					}
+		while let Some(t) = self.current() {
+			match t {
+				Token::Comma => self.advance(),
+				Token::SemiColon => {
 					self.advance();
-					break;
-				},
 
-				Some(&Token::Comma) => {
-					self.advance();
-				},
-
-				Some(&Token::SemiColon) => {
 					if row.is_empty() {
-						self.advance();
 						continue;
 					}
 
 					let cap = row.len();
 					mat.push(row);
 					row = Vec::with_capacity(cap);
-
-					self.advance();
 				},
 
+				Token::CloseBracket => {
+					self.advance();
+					if !row.is_empty() {
+						mat.push(row);
+					}
+					self.is_inside_matrix = false; // WARN: we could be inside a child matrix here
+					return Ok(ASTNodeValue::Matrix(mat));
+				},
+
+				Token::EndOfFile => return Err(ParsingError::IncompleteStatement),
+
 				_ => {
+					self.is_inside_matrix = true; // This is here because a child matrix could set this to false
 					let expr = self.parse_expr()?;
 					row.push(expr);
 				},
 			}
 		}
 
-		let res = ASTNode {
-			kind: ASTNodeKind::Matrix(mat),
-			store_in_ans: false,
-			print_result: false,
-		};
-
-		Ok(res)
+		unreachable!("We've somehow passed the EOF token at the end of the tokens array")
 	}
 }

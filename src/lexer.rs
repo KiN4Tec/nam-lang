@@ -29,7 +29,7 @@ impl Iterator for Lexer {
 
 			'0'..='9' => {
 				self.idx -= 1;
-				Some(self.next_number())
+				Some(self.tokenize_number())
 			},
 
 			'A'..='Z' | 'a'..='z' | '_' => {
@@ -90,12 +90,20 @@ impl Lexer {
 		res
 	}
 
-	fn next_number(&mut self) -> Result<Token, TokenizationError> {
+	fn tokenize_number(&mut self) -> Result<Token, TokenizationError> {
 		let mut res = String::new();
 		let mut is_frac = false;
 		let mut is_expo = false;
 
-		while let Some(&next) = self.advance() {
+		loop {
+			let next = match self.advance() {
+				None => {
+					self.idx -= 1;
+					break;
+				},
+				Some(&c) => c,
+			};
+
 			match next {
 				'0'..='9' => {
 					res.push(next);
@@ -109,7 +117,7 @@ impl Lexer {
 							TokenizationErrorKind::UnexpectedChar('.'),
 							Some(res),
 							Some(String::from(
-								"Could not parse a numeric literal with a dot after the 'e' in a scientific notation.",
+								"Could not parse a numeric literal with a floating point number after the 'e' in a scientific notation.",
 							)),
 						));
 					}
@@ -154,8 +162,8 @@ impl Lexer {
 							return Err(TokenizationError::new(
 								TokenizationErrorKind::UnexpectedChar('e'),
 								Some(res),
-								Some(String::from("The scientific notation is not complete.")),
-							))
+								Some(String::from("A scientific notated number is not complete.")),
+							));
 						},
 					}
 				},
