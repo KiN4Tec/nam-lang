@@ -99,7 +99,7 @@ impl std::str::FromStr for Token {
 					TokenizationErrorKind::EmptyString,
 					Some(input),
 					None,
-				))
+				));
 			},
 		};
 
