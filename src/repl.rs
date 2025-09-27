@@ -68,29 +68,29 @@ impl Repl {
 struct Prompt {}
 
 impl reedline::Prompt for Prompt {
-	fn render_prompt_left(&self) -> std::borrow::Cow<str> {
+	fn render_prompt_left(&'_ self) -> std::borrow::Cow<'_, str> {
 		std::borrow::Cow::Borrowed(" \nnam")
 	}
 
-	fn render_prompt_right(&self) -> std::borrow::Cow<str> {
+	fn render_prompt_right(&'_ self) -> std::borrow::Cow<'_, str> {
 		std::borrow::Cow::Borrowed("")
 	}
 
 	fn render_prompt_indicator(
-		&self,
+		&'_ self,
 		_prompt_mode: reedline::PromptEditMode,
-	) -> std::borrow::Cow<str> {
+	) -> std::borrow::Cow<'_, str> {
 		std::borrow::Cow::Borrowed(" > ")
 	}
 
-	fn render_prompt_multiline_indicator(&self) -> std::borrow::Cow<str> {
+	fn render_prompt_multiline_indicator(&'_ self) -> std::borrow::Cow<'_, str> {
 		std::borrow::Cow::Borrowed(" > ")
 	}
 
 	fn render_prompt_history_search_indicator(
-		&self,
+		&'_ self,
 		_history_search: reedline::PromptHistorySearch,
-	) -> std::borrow::Cow<str> {
+	) -> std::borrow::Cow<'_, str> {
 		std::borrow::Cow::Borrowed(" > ")
 	}
 }
