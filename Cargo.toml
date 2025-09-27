@@ -8,5 +8,4 @@ publish = false
 
 [dependencies]
 color-eyre = "0.6.5"
-nalgebra = "0.34.0"
 reedline = "0.41.0"

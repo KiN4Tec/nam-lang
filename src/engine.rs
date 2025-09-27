@@ -1,9 +1,10 @@
 use crate::{
 	ast::{ASTNode, ASTNodeValue, Operator},
 	errors::EvaluationError,
+	matrix::Matrix,
 	runtime::RuntimeVal,
 };
-use nalgebra::{DMatrix, RowDVector, dmatrix};
+
 use std::collections::HashMap;
 
 pub struct Engine {
@@ -28,7 +29,7 @@ impl Engine {
 	pub fn evaluate(&mut self, ast: ASTNode) -> Result<RuntimeVal, EvaluationError> {
 		match ast.value {
 			ASTNodeValue::Number(n) => {
-				let res = RuntimeVal::Number(n);
+				let res = RuntimeVal::Scalar(n);
 
 				if ast.store_in_ans {
 					self.assign_var("ans".to_string(), res.clone());
@@ -42,7 +43,7 @@ impl Engine {
 
 			ASTNodeValue::Matrix(mat) => {
 				let res = if mat.is_empty() {
-					RuntimeVal::Matrix(dmatrix![])
+					RuntimeVal::Matrix(Matrix::new())
 				} else {
 					let width = mat[0].len();
 					let height = mat.len();
@@ -56,12 +57,14 @@ impl Engine {
 						let mut res_row = Vec::with_capacity(width);
 						for cell in row {
 							match self.evaluate(cell)? {
-								RuntimeVal::Matrix(_) => return Err(EvaluationError::NestedMatrices),
+								RuntimeVal::Matrix(_) => {
+									return Err(EvaluationError::NestedMatrices);
+								},
 
-								RuntimeVal::Number(res_cell) => res_row.push(res_cell),
+								RuntimeVal::Scalar(res_cell) => res_row.push(res_cell),
 								RuntimeVal::Variable(name) => {
 									let val = match self.get_var(&name) {
-										Some(RuntimeVal::Number(v)) => v,
+										Some(RuntimeVal::Scalar(v)) => v,
 										Some(RuntimeVal::Matrix(_)) => {
 											return Err(EvaluationError::NestedMatrices);
 										},
@@ -72,13 +75,13 @@ impl Engine {
 								},
 							}
 						}
-						res_mat.push(RowDVector::from_row_slice(res_row.as_slice()));
+						res_mat.push(res_row);
 					}
 
 					if width == 1 && height == 1 {
-						RuntimeVal::Number(res_mat[0][0])
+						RuntimeVal::Scalar(res_mat[0][0])
 					} else {
-						RuntimeVal::Matrix(DMatrix::from_rows(&res_mat))
+						RuntimeVal::Matrix(Matrix::try_from_rows(res_mat)?)
 					}
 				};
 
@@ -154,7 +157,7 @@ impl Engine {
 							}
 						},
 
-						ASTNodeValue::Number(val) => evaluation_stack.push(RuntimeVal::Number(val)),
+						ASTNodeValue::Number(val) => evaluation_stack.push(RuntimeVal::Scalar(val)),
 
 						ASTNodeValue::Variable(name) => {
 							evaluation_stack.push(RuntimeVal::Variable(name))

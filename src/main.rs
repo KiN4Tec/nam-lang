@@ -3,6 +3,8 @@ mod repl;
 mod token;
 mod ast;
 mod runtime;
+mod matrix;
+mod scalar;
 
 mod lexer;
 mod parser;

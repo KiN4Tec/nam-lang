@@ -1,122 +1,115 @@
 use crate::errors::EvaluationError;
-use nalgebra::DMatrix;
+use crate::matrix::Matrix;
+use crate::scalar::Scalar;
 
 #[derive(Debug, Clone)]
 pub enum RuntimeVal {
 	Variable(String),
-	Number(f64),
-	Matrix(DMatrix<f64>),
+	Scalar(Scalar),
+	Matrix(Matrix),
 }
 
 impl RuntimeVal {
 	pub fn try_add(self, rhs: Self) -> Result<Self, EvaluationError> {
 		match (self, rhs) {
-			(Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs + rhs)),
+			(Self::Scalar(lhs), Self::Scalar(rhs)) => Ok(Self::Scalar(lhs + rhs)),
 
 			(Self::Matrix(lhs), Self::Matrix(rhs)) => {
-				if lhs.ncols() != rhs.ncols() || lhs.nrows() != rhs.nrows() {
+				if lhs.get_shape() != rhs.get_shape() {
 					return Err(EvaluationError::DimensionsMismatch(
-						lhs.shape(),
-						rhs.shape(),
+						lhs.get_shape(),
+						rhs.get_shape(),
 					));
 				}
-
 				Ok(RuntimeVal::Matrix(lhs + rhs))
 			},
 
-			(Self::Matrix(mat), Self::Number(num)) | (Self::Number(num), Self::Matrix(mat)) => {
-				Ok(RuntimeVal::Matrix(mat.add_scalar(num)))
+			(Self::Matrix(mat), Self::Scalar(num)) | (Self::Scalar(num), Self::Matrix(mat)) => {
+				Ok(RuntimeVal::Matrix(mat + num))
 			},
 
-			_ => unreachable!("Variables must be evaluated in the engine first"),
+			(Self::Variable(_), _) | (_, Self::Variable(_)) => {
+				unreachable!("Variables must be evaluated in the engine first")
+			},
 		}
 	}
 
 	pub fn try_sub(self, rhs: Self) -> Result<Self, EvaluationError> {
 		match (self, rhs) {
-			(Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs - rhs)),
+			(Self::Scalar(lhs), Self::Scalar(rhs)) => Ok(Self::Scalar(lhs - rhs)),
 
 			(Self::Matrix(lhs), Self::Matrix(rhs)) => {
-				if lhs.ncols() != rhs.ncols() || lhs.nrows() != rhs.nrows() {
+				if lhs.get_shape() != rhs.get_shape() {
 					return Err(EvaluationError::DimensionsMismatch(
-						lhs.shape(),
-						rhs.shape(),
+						lhs.get_shape(),
+						rhs.get_shape(),
 					));
 				}
-
 				Ok(Self::Matrix(lhs - rhs))
 			},
 
-			(Self::Matrix(mat), Self::Number(num)) => Ok(RuntimeVal::Matrix(mat.add_scalar(-num))),
+			(Self::Matrix(mat), Self::Scalar(num)) => Ok(RuntimeVal::Matrix(mat - num)),
+			(Self::Scalar(num), Self::Matrix(mat)) => Ok(RuntimeVal::Matrix(num - mat)),
 
-			(Self::Number(num), Self::Matrix(mut mat)) => {
-				mat.neg_mut();
-				Ok(RuntimeVal::Matrix(mat.add_scalar(num)))
+			(Self::Variable(_), _) | (_, Self::Variable(_)) => {
+				unreachable!("Variables must be evaluated in the engine first")
 			},
-
-			_ => unreachable!("Variables must be evaluated in the engine first"),
 		}
 	}
 
 	pub fn try_mul(self, rhs: Self) -> Result<Self, EvaluationError> {
 		match (self, rhs) {
-			(Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs * rhs)),
+			(Self::Scalar(lhs), Self::Scalar(rhs)) => Ok(Self::Scalar(lhs * rhs)),
 
 			(Self::Matrix(lhs), Self::Matrix(rhs)) => {
-				if lhs.ncols() != rhs.nrows() {
-					Err(EvaluationError::DimensionsMismatch(
-						lhs.shape(),
-						rhs.shape(),
-					))
-				} else {
-					Ok(RuntimeVal::Matrix(lhs * rhs))
+				if lhs.width() != rhs.height() {
+					return Err(EvaluationError::DimensionsMismatch(
+						lhs.get_shape(),
+						rhs.get_shape(),
+					));
 				}
+				Ok(RuntimeVal::Matrix(lhs * rhs))
 			},
 
-			(Self::Matrix(mut mat), Self::Number(num))
-			| (Self::Number(num), Self::Matrix(mut mat)) => {
-				for e in mat.iter_mut() {
-					*e *= num;
-				}
-				Ok(Self::Matrix(mat))
+			(Self::Matrix(mat), Self::Scalar(num)) | (Self::Scalar(num), Self::Matrix(mat)) => {
+				Ok(Self::Matrix(mat * num))
 			},
 
-			_ => unreachable!("Variables must be evaluated in the engine first"),
+			(Self::Variable(_), _) | (_, Self::Variable(_)) => {
+				unreachable!("Variables must be evaluated in the engine first")
+			},
 		}
 	}
 
 	pub fn try_div(self, rhs: Self) -> Result<Self, EvaluationError> {
 		match (self, rhs) {
-			(Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs / rhs)),
+			(Self::Scalar(lhs), Self::Scalar(rhs)) => Ok(Self::Scalar(lhs / rhs)),
 
 			(Self::Matrix(lhs), Self::Matrix(rhs)) => {
 				if !rhs.is_square() {
 					return Err(EvaluationError::NoninvertibleDivisorMatrix);
 				}
 
-				if lhs.shape() != rhs.shape() {
-					return Err(EvaluationError::DimensionsMismatch(lhs.shape(), rhs.shape()));
+				if lhs.get_shape() != rhs.get_shape() {
+					return Err(EvaluationError::DimensionsMismatch(
+						lhs.get_shape(),
+						rhs.get_shape(),
+					));
 				}
 
-				if let Some(inv_rhs) = rhs.try_inverse() {
+				if let Some(inv_rhs) = rhs.try_invert() {
 					Ok(Self::Matrix(lhs * inv_rhs))
 				} else {
 					Err(EvaluationError::NoninvertibleDivisorMatrix)
 				}
 			},
 
-			(Self::Matrix(mut mat), Self::Number(num)) => {
-				for e in mat.iter_mut() {
-					*e /= num;
-				}
-				Ok(Self::Matrix(mat))
-			},
+			(Self::Matrix(mat), Self::Scalar(num)) => Ok(Self::Matrix(mat / num)),
+			(Self::Scalar(num), Self::Matrix(mat)) => Ok(Self::Matrix(num / mat)),
 
-			(Self::Number(_num), Self::Matrix(mat)) => {
-				Err(EvaluationError::DimensionsMismatch((1, 1), mat.shape()))
+			(Self::Variable(_), _) | (_, Self::Variable(_)) => {
+				unreachable!("Variables must be evaluated in the engine first")
 			},
-
-			_ => unreachable!("Variables must be evaluated in the engine first"),
 		}
 	}
 }
@@ -124,7 +117,7 @@ impl RuntimeVal {
 impl std::fmt::Display for RuntimeVal {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Number(n) => write!(f, "{n}"),
+			Self::Scalar(n) => write!(f, "{n}"),
 			Self::Matrix(mat) => write!(f, "{mat}"),
 			Self::Variable(name) => write!(f, "{name}"),
 		}
