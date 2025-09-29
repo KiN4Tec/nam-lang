@@ -301,15 +301,16 @@ impl Div<Scalar> for Matrix {
 
 impl Matrix {
 	/// # Returns
-	/// A tuple of (L, U, P) where:
+	/// A tuple of (L, U, P, R) where:
 	/// - L is the Lower triangular matrix
 	/// - U is the Upper triangular matrix
 	/// - P is the Permutations vector which can be converted into a permutation matrix
+	/// - R is the rank of the matrix
 	///
 	/// such that PA = LU where A is the input matrix
 	///
 	/// See `Matrix::from_permutations_vector`
-	pub fn lu_decomp(&self) -> (Self, Self, Vec<usize>) {
+	pub fn lu_decomp(&self) -> (Self, Self, Vec<usize>, usize) {
 		let mut lower = Self::zeros_rect(self.nrows(), self.ncols());
 		let mut upper = self.clone();
 		let mut permutations: Vec<usize> = (0..self.height()).collect();
@@ -360,22 +361,19 @@ impl Matrix {
 			lower[(i, i)] = 1.0;
 		}
 
-		(lower, upper, permutations)
+		let rank = upper.width() - shift;
+
+		(lower, upper, permutations, rank)
 	}
 
 	pub fn row_echelon_form(&self) -> Self {
-		let (_, upper, _) = self.lu_decomp();
+		let (_, upper, _, _) = self.lu_decomp();
 		upper
 	}
 
 	pub fn rank(&self) -> usize {
-		let ref_mat = self.row_echelon_form();
-		for (idx, &cell) in ref_mat.iter().enumerate().rev() {
-			if cell != 0.0 {
-				return idx / ref_mat.width();
-			}
-		}
-		ref_mat.height()
+		let (_, _, _, rank) = self.lu_decomp();
+		rank
 	}
 
 	pub fn try_det(&self) -> Option<Scalar> {
