@@ -553,8 +553,12 @@ impl Matrix {
 	}
 
 	pub fn swap_rows(&mut self, row1: usize, row2: usize) {
-		assert!(row1 < self.width() && row2 < self.width());
-		for col in 0..self.width() {
+		assert!(
+			row1 < self.nrows() && row2 < self.nrows(),
+			"Matrix was indexed out of bounds"
+		);
+
+		for col in 0..self.ncols() {
 			let temp = self[(row1, col)];
 			self[(row1, col)] = self[(row2, col)];
 			self[(row2, col)] = temp;
@@ -562,7 +566,39 @@ impl Matrix {
 	}
 
 	pub fn swap_rows_starting_from(&mut self, row1: usize, row2: usize, start_col: usize) {
-		for col in start_col..self.width() {
+		assert!(
+			row1 < self.nrows() && row2 < self.nrows(),
+			"Matrix was indexed out of bounds"
+		);
+
+		// If `start_col` was larger than `self.ncols` this function won't execute
+		for col in start_col..self.ncols() {
+			let temp = self[(row1, col)];
+			self[(row1, col)] = self[(row2, col)];
+			self[(row2, col)] = temp;
+		}
+	}
+
+	pub fn swap_rows_ending_at(&mut self, row1: usize, row2: usize, end_col: usize) {
+		assert!(
+			row1 < self.nrows() && row2 < self.nrows() && end_col < self.ncols(),
+			"Matrix was indexed out of bounds"
+		);
+
+		for col in 0..=end_col {
+			let temp = self[(row1, col)];
+			self[(row1, col)] = self[(row2, col)];
+			self[(row2, col)] = temp;
+		}
+	}
+
+	pub fn swap_rows_ranged(&mut self, row1: usize, row2: usize, range: std::ops::Range<usize>) {
+		assert!(
+			row1 < self.nrows() && row2 < self.nrows() && range.end <= self.ncols(),
+			"Matrix was indexed out of bounds"
+		);
+
+		for col in range {
 			let temp = self[(row1, col)];
 			self[(row1, col)] = self[(row2, col)];
 			self[(row2, col)] = temp;
