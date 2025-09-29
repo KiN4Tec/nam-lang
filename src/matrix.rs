@@ -327,6 +327,7 @@ impl Matrix {
 						continue;
 					}
 					upper.swap_rows_starting_from(pivot_row, row, pivot_col);
+					lower.swap_rows_ending_at(pivot_row, row, pivot_col - 1);
 					permutations.swap(pivot_row, row);
 					break;
 				}
