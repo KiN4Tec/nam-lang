@@ -57,20 +57,14 @@ impl Matrix {
 		})
 	}
 
-	pub fn identity(nrows: usize, ncols: usize) -> Self {
-		let mut data = vec![0.0; nrows * ncols];
-
-		for i in 0..nrows {
-			data[i * ncols + i] = 1.0;
-		}
-
-		Self {
-			data,
-			shape: (nrows, ncols),
-		}
-	}
-
-	pub fn identity_rect(size: usize) -> Self {
+	/// Creates an identitiy matrix where the width and height are the same
+	///
+	/// # Parameters
+	/// - size: the width or height of the matrix
+	///
+	/// See also `Matrix::identity_rect()`
+	///
+	pub fn identity_square(size: usize) -> Self {
 		let mut data = vec![0.0; size * size];
 
 		for i in 0..size {
@@ -83,36 +77,63 @@ impl Matrix {
 		}
 	}
 
-	pub fn zeros(nrows: usize, ncolumns: usize) -> Self {
+	pub fn identity_rect(nrows: usize, ncols: usize) -> Self {
+		let mut data = vec![0.0; nrows * ncols];
+
+		for i in 0..nrows {
+			data[i * ncols + i] = 1.0;
+		}
+
 		Self {
-			data: vec![0.0; nrows * ncolumns],
-			shape: (nrows, ncolumns),
+			data,
+			shape: (nrows, ncols),
 		}
 	}
 
-	pub fn zeros_rect(size: usize) -> Self {
+	/// Creates a matrix of zeros where the width and height are the same
+	///
+	/// # Parameters
+	/// - size: the width or height of the matrix
+	///
+	/// See also `Matrix::zeros_rect()`
+	///
+	pub fn zeros_square(size: usize) -> Self {
 		Self {
 			data: vec![0.0; size * size],
 			shape: (size, size),
 		}
 	}
 
-	pub fn ones(nrows: usize, ncolumns: usize) -> Self {
+	pub fn zeros_rect(nrows: usize, ncolumns: usize) -> Self {
 		Self {
-			data: vec![1.0; nrows * ncolumns],
+			data: vec![0.0; nrows * ncolumns],
 			shape: (nrows, ncolumns),
 		}
 	}
 
-	pub fn ones_rect(size: usize) -> Self {
+	/// Creates a matrix of ones where the width and height are the same
+	///
+	/// # Parameters
+	/// - size: the width or height of the matrix
+	///
+	/// See also `Matrix::ones_rect()`
+	///
+	pub fn ones_square(size: usize) -> Self {
 		Self {
 			data: vec![1.0; size * size],
 			shape: (size, size),
 		}
 	}
 
+	pub fn ones_rect(nrows: usize, ncolumns: usize) -> Self {
+		Self {
+			data: vec![1.0; nrows * ncolumns],
+			shape: (nrows, ncolumns),
+		}
+	}
+
 	pub fn from_permutations_vector(input: Vec<usize>) -> Self {
-		let mut output = Self::zeros_rect(input.len());
+		let mut output = Self::zeros_square(input.len());
 		for (col, row) in input.into_iter().enumerate() {
 			output[(row, col)] = 1.0;
 		}
@@ -289,7 +310,7 @@ impl Matrix {
 	///
 	/// See `Matrix::from_permutations_vector`
 	pub fn lu_decomp(&self) -> (Self, Self, Vec<usize>) {
-		let mut lower = Self::zeros(self.nrows(), self.ncols());
+		let mut lower = Self::zeros_rect(self.nrows(), self.ncols());
 		let mut upper = self.clone();
 		let mut permutations: Vec<usize> = (0..self.height()).collect();
 
@@ -374,7 +395,7 @@ impl Matrix {
 			return None;
 		}
 
-		let mut res = Self::identity_rect(self.height());
+		let mut res = Self::identity_square(self.height());
 
 		for prim in 0..self.ncols() {
 			// Primary Diagonal Element (where row index = column index)
