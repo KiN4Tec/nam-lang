@@ -361,7 +361,7 @@ impl Matrix {
 			lower[(i, i)] = 1.0;
 		}
 
-		let rank = upper.width() - shift;
+		let rank = (upper.width() - shift).min(upper.height());
 
 		(lower, upper, permutations, rank)
 	}
