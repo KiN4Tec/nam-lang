@@ -381,11 +381,49 @@ impl Matrix {
 			return None;
 		}
 
-		let ref_mat = self.row_echelon_form();
+		let (_, ref_mat, permutations_vec, _) = self.lu_decomp();
+
+		// Calulate the value of the determinant
 		let mut res = 1.0;
 		for i in 0..ref_mat.height() {
 			res *= ref_mat[(i, i)];
 		}
+
+		// Get the number of the permutations
+		let mut permutations_count = 0;
+		let mut is_visited = vec![false; permutations_vec.len()];
+		for (row1, &row2) in permutations_vec.iter().enumerate() {
+			if row2 >= permutations_vec.len() {
+				panic!("Some Permutations Vector was indexed out of bounds");
+			}
+
+			if row1 == row2 {
+				is_visited[row1] = true;
+			}
+
+			if is_visited[row1] {
+				continue;
+			}
+
+			let mut row = row1;
+			while !is_visited[row] {
+				is_visited[row] = true;
+				row = permutations_vec[row];
+
+				if row >= permutations_vec.len() {
+					panic!("Some Permutations Vector has indexes a row out of bounds");
+				}
+
+				if !is_visited[row] {
+					permutations_count += 1;
+				}
+			}
+		}
+
+		if (permutations_count % 2) == 1 {
+			res = -res
+		}
+
 		Some(res)
 	}
 
