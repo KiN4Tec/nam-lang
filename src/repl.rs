@@ -2,7 +2,7 @@ use {
 	crate::{
 		engine::Engine, errors::TokenizationError, lexer::Lexer, parser::Parser, token::Token,
 	},
-	color_eyre::eyre::Result,
+	anyhow::Result,
 	reedline::Signal,
 };
 
@@ -34,7 +34,7 @@ impl Repl {
 				Signal::Success(input) => {
 					let r = self.on_prompt(input);
 					if let Err(e) = r {
-						eprintln!("{e:?}");
+						eprintln!("\n{e}");
 					}
 				},
 			}
