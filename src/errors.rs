@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenizationError {
 	kind: TokenizationErrorKind,
 	token_str: Option<String>,
@@ -19,7 +19,7 @@ impl TokenizationError {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenizationErrorKind {
 	EmptyString,
 	NotANumber,
@@ -54,7 +54,7 @@ impl std::fmt::Display for TokenizationError {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsingError {
 	UnmatchedOpenParen,
 	UnmatchedCloseParen,
@@ -90,7 +90,7 @@ impl std::fmt::Display for ParsingError {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvaluationError {
 	NonexistantVar(String),
 	NestedMatrices,
