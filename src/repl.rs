@@ -1,7 +1,5 @@
 use {
-	crate::{
-		engine::Engine, errors::TokenizationError, lexer::Lexer, parser::Parser, token::Token,
-	},
+	crate::{engine::Engine, lexer::Lexer, parser::Parser},
 	anyhow::Result,
 	reedline::Signal,
 };
@@ -55,9 +53,8 @@ impl Repl {
 			return Ok(());
 		}
 
-		let lexer = Lexer::new(input.chars().collect());
-		let tokens = lexer.collect::<Result<Vec<Token>, TokenizationError>>()?;
-		let mut parser = Parser::new(&tokens);
+		let lexer = Lexer::new(input.chars());
+		let mut parser = Parser::new(lexer);
 		self.engine.evaluate(parser.parse()?)?;
 
 		Ok(())

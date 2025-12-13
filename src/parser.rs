@@ -1,35 +1,23 @@
 use crate::{
 	ast::{ASTNode, ASTNodeValue, Operator},
 	errors::ParsingError,
+	lexer::Lexer,
 	token::Token,
 };
 
-pub struct Parser {
-	idx: usize,
-	tokens: Box<[Token]>,
+pub struct Parser<'a> {
+	input: std::iter::Peekable<Lexer<'a>>,
 	is_inside_matrix: bool,
+	last_token: Option<Token>,
 }
 
-impl Parser {
-	pub fn new(tokens: &[Token]) -> Self {
+impl<'a> Parser<'a> {
+	pub fn new(input: Lexer<'a>) -> Self {
 		Self {
-			idx: 0,
-			tokens: tokens.into(),
+			input: input.peekable(),
 			is_inside_matrix: false,
+			last_token: None,
 		}
-	}
-
-	fn current(&mut self) -> Option<&Token> {
-		self.tokens.get(self.idx)
-	}
-
-	fn next(&mut self) -> Option<&Token> {
-		self.idx += 1;
-		self.tokens.get(self.idx)
-	}
-
-	fn advance(&mut self) {
-		self.idx += 1;
 	}
 
 	pub fn parse(&mut self) -> Result<ASTNode, ParsingError> {
@@ -39,7 +27,7 @@ impl Parser {
 	fn parse_stmt(&mut self) -> Result<ASTNode, ParsingError> {
 		let mut res = self.parse_expr()?;
 
-		match self.current() {
+		match self.next_token()? {
 			Some(Token::EndOfFile) | Some(Token::EndOfLine) => {
 				res.print_result = true;
 			},
@@ -93,18 +81,18 @@ impl Parser {
 		let mut last_precedence = 0; // The precedence of the last element in the temp stack
 		let mut last_was_operand = false;
 
-		while let Some(token) = self.current() {
+		while let Some(token) = self.next_token()? {
 			match token {
 				Token::NumericLiteral(n) => {
 					if last_was_operand {
 						if self.is_inside_matrix {
+							self.last_token = Some(token);
 							break;
 						}
 						return Err(ParsingError::InvalidArithmaticExpression);
 					}
 
-					res.push(ASTNodeValue::Number(*n));
-					self.advance();
+					res.push(ASTNodeValue::Number(n));
 
 					last_was_operand = true;
 				},
@@ -112,13 +100,13 @@ impl Parser {
 				Token::Identifier(var_name) => {
 					if last_was_operand {
 						if self.is_inside_matrix {
+							self.last_token = Some(Token::Identifier(var_name));
 							break;
 						}
 						return Err(ParsingError::InvalidArithmaticExpression);
 					}
 
-					res.push(ASTNodeValue::Variable(var_name.clone()));
-					self.advance();
+					res.push(ASTNodeValue::Variable(var_name));
 
 					last_was_operand = true;
 				},
@@ -126,11 +114,13 @@ impl Parser {
 				Token::OpenBracket => {
 					if last_was_operand {
 						if self.is_inside_matrix {
+							self.last_token = Some(token);
 							break;
 						}
 						return Err(ParsingError::InvalidArithmaticExpression);
 					}
 
+					self.last_token = Some(token);
 					res.push(self.parse_matrix()?);
 
 					last_was_operand = true;
@@ -144,21 +134,20 @@ impl Parser {
 					let precedence = Operator::try_from(token.clone())?.precedence();
 
 					while precedence < last_precedence {
-						res.push(ASTNodeValue::Operator(Operator::try_from(
-							temp.pop().unwrap(), // Unwrapping because loop will break on None
-						)?));
+						res.push(ASTNodeValue::Operator(
+							temp.pop().unwrap().try_into().unwrap(), // Unwrapping because loop will break on None
+						));
 
 						// Start of next loop
-						last_precedence = match temp.last() {
+						last_precedence = match temp.last().cloned() {
 							Some(Token::OpenParen) => 0, // loop will break automatically, so OpenParen should never get poped here
-							Some(o) => Operator::try_from(o.clone())?.precedence(),
+							Some(o) => Operator::try_from(o).unwrap().precedence(),
 							None => 0, // Unwrapping should be safe because of this
 						}
 					}
 
 					last_precedence = precedence;
-					temp.push(token.clone());
-					self.advance();
+					temp.push(token);
 
 					last_was_operand = false;
 				},
@@ -166,15 +155,15 @@ impl Parser {
 				Token::OpenParen => {
 					if last_was_operand {
 						if self.is_inside_matrix {
+							self.last_token = Some(token);
 							break;
 						}
 						return Err(ParsingError::InvalidArithmaticExpression);
 					}
 
-					temp.push(Token::OpenParen);
+					temp.push(token);
 					precedence_stack.push(last_precedence);
 					last_precedence = 0;
-					self.advance();
 
 					last_was_operand = false;
 				},
@@ -186,24 +175,22 @@ impl Parser {
 
 					loop {
 						let last = match temp.pop() {
+							Some(Token::OpenParen) => break,
 							Some(t) => t,
 							None => return Err(ParsingError::UnmatchedCloseParen),
 						};
 
-						if last == Token::OpenParen {
-							last_precedence = precedence_stack.pop().unwrap();
-							break;
-						}
-
-						res.push(ASTNodeValue::Operator(Operator::try_from(last)?));
+						res.push(ASTNodeValue::Operator(Operator::try_from(last).unwrap()));
 					}
 
-					self.advance();
-
+					last_precedence = precedence_stack.pop().unwrap();
 					last_was_operand = true;
 				},
 
-				_ => break,
+				t => {
+					self.last_token = Some(t);
+					break;
+				},
 			};
 		}
 
@@ -235,9 +222,11 @@ impl Parser {
 	}
 
 	fn parse_matrix(&mut self) -> Result<ASTNodeValue, ParsingError> {
-		assert_eq!(self.current(), Some(&Token::OpenBracket));
-		if self.next() == Some(&Token::CloseBracket) {
-			self.advance();
+		assert_eq!(self.last_token, Some(Token::OpenBracket));
+		self.last_token = None;
+
+		if self.input.peek() == Some(&Ok(Token::CloseBracket)) {
+			self.input.next();
 			return Ok(ASTNodeValue::Matrix(vec![]));
 		}
 
@@ -247,12 +236,11 @@ impl Parser {
 		let mut mat = Vec::new();
 		let mut row = vec![first];
 
-		while let Some(t) = self.current() {
+		while let Some(t) = self.next_token()? {
 			match t {
-				Token::Comma => self.advance(),
-				Token::SemiColon => {
-					self.advance();
+				Token::Comma => {},
 
+				Token::SemiColon => {
 					if row.is_empty() {
 						continue;
 					}
@@ -263,7 +251,6 @@ impl Parser {
 				},
 
 				Token::CloseBracket => {
-					self.advance();
 					if !row.is_empty() {
 						mat.push(row);
 					}
@@ -275,6 +262,7 @@ impl Parser {
 
 				_ => {
 					self.is_inside_matrix = true; // This is here because a child matrix could set this to false
+					self.last_token = Some(t);
 					let expr = self.parse_expr()?;
 					row.push(expr);
 				},
@@ -282,5 +270,14 @@ impl Parser {
 		}
 
 		unreachable!("We've somehow passed the EOF token at the end of the tokens array")
+	}
+
+	fn next_token(&mut self) -> Result<Option<Token>, ParsingError> {
+		if self.last_token.is_some() {
+			return Ok(std::mem::take(&mut self.last_token));
+		}
+
+		// The ? operator here is turning the `TokenizationError` into `ParsingError::TokenizationError`
+		Ok(self.input.next().transpose()?)
 	}
 }

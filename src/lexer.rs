@@ -2,66 +2,60 @@ use crate::{
 	errors::{TokenizationError, TokenizationErrorKind},
 	token::Token,
 };
+use std::str::Chars;
 
-pub struct Lexer {
-	input: Box<[char]>,
-	idx: usize,
+pub struct Lexer<'l> {
+	input: std::iter::Peekable<Chars<'l>>,
+	is_eof_retruned: bool,
 	pub last_error: Option<TokenizationError>,
 }
 
-impl Iterator for Lexer {
+impl<'l> Iterator for Lexer<'l> {
 	type Item = Result<Token, TokenizationError>;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		if self.idx > self.input.len() {
-			return None;
+		if self.input.peek().is_none() {
+			if self.is_eof_retruned {
+				return None;
+			} else {
+				self.is_eof_retruned = true;
+				return Some(Ok(Token::EndOfFile));
+			}
 		}
 
-		let first = match self.advance() {
-			Some(c) => c,
-			None => return Some(Ok(Token::EndOfFile)),
-		};
-
-		match first {
+		match self.input.peek().unwrap() {
 			'+' | '-' | '*' | '/' | '(' | ')' | '[' | ']' | '{' | '}' | '=' | ',' | ';' => {
-				Some(first.to_string().parse())
+				Some(self.input.next().unwrap().to_string().parse())
 			},
 
-			'0'..='9' => {
-				self.idx -= 1;
-				Some(self.tokenize_number())
-			},
+			'0'..='9' => Some(self.tokenize_number()),
 
 			'A'..='Z' | 'a'..='z' | '_' => {
-				let mut res = first.to_string();
+				let mut res = self.input.next().unwrap().to_string();
 
-				while let Some(&next) = self.advance() {
-					if !next.is_ascii_alphanumeric() && next != '_' {
-						break;
-					}
-					res.push(next);
+				while let Some(c) = self
+					.input
+					.next_if(|c| c.is_ascii_alphanumeric() || c == &'_')
+				{
+					res.push(c);
 				}
 
-				self.idx -= 1;
 				Some(res.parse())
 			},
 
 			'\n' => {
-				self.advance();
+				self.input.next();
 				Some(Ok(Token::EndOfLine))
 			},
 
 			'\r' => {
-				self.advance();
-				if self.advance() != Some(&'\n') {
-					self.idx -= 1;
-				}
+				self.input.next();
+				self.input.next_if_eq(&'\n');
 				Some(Ok(Token::EndOfLine))
 			},
 
 			' ' => {
-				while self.advance() == Some(&' ') {}
-				self.idx -= 1;
+				while self.input.next_if_eq(&' ').is_some() {};
 				self.next()
 			},
 
@@ -75,19 +69,13 @@ impl Iterator for Lexer {
 	}
 }
 
-impl Lexer {
-	pub fn new(input: Box<[char]>) -> Self {
+impl<'l> Lexer<'l> {
+	pub fn new(input: Chars<'l>) -> Self {
 		Self {
-			input,
-			idx: 0,
+			input: input.peekable(),
+			is_eof_retruned: false,
 			last_error: None,
 		}
-	}
-
-	fn advance(&mut self) -> Option<&char> {
-		let res = self.input.get(self.idx);
-		self.idx += 1;
-		res
 	}
 
 	fn tokenize_number(&mut self) -> Result<Token, TokenizationError> {
@@ -95,22 +83,14 @@ impl Lexer {
 		let mut is_frac = false;
 		let mut is_expo = false;
 
-		loop {
-			let next = match self.advance() {
-				None => {
-					self.idx -= 1;
-					break;
-				},
-				Some(&c) => c,
-			};
-
+		while let Some(next) = self.input.peek() {
 			match next {
 				'0'..='9' => {
-					res.push(next);
+					res.push(self.input.next().unwrap());
 				},
 
 				'.' => {
-					res.push(next);
+					res.push(self.input.next().unwrap());
 
 					if is_expo {
 						return Err(TokenizationError::new(
@@ -136,7 +116,7 @@ impl Lexer {
 				},
 
 				'e' | 'E' => {
-					res.push(next);
+					res.push(self.input.next().unwrap());
 
 					if is_expo {
 						return Err(TokenizationError::new(
@@ -151,13 +131,12 @@ impl Lexer {
 					is_expo = true;
 					is_frac = true;
 
-					while self.advance() == Some(&'_') {}
-					self.idx -= 1;
+					while self.input.next_if_eq(&'_').is_some() {}
 
-					match self.advance() {
+					match self.input.next() {
 						Some('+') => res.push('+'),
 						Some('-') => res.push('-'),
-						Some(&n) if n.is_ascii_digit() => res.push(n),
+						Some(c) if c.is_ascii_digit() => res.push(c),
 						None | Some(_) => {
 							return Err(TokenizationError::new(
 								TokenizationErrorKind::UnexpectedChar('e'),
@@ -169,6 +148,7 @@ impl Lexer {
 				},
 
 				'A'..='Z' | 'a'..='z' => {
+					let next = self.input.next().unwrap();
 					res.push(next);
 					return Err(TokenizationError::new(
 						TokenizationErrorKind::UnspportedSyntax(next.to_string()),
@@ -179,10 +159,7 @@ impl Lexer {
 
 				'_' => {},
 
-				_ => {
-					self.idx -= 1;
-					break;
-				},
+				_ => break,
 			}
 		}
 

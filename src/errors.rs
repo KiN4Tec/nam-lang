@@ -65,6 +65,8 @@ pub enum ParsingError {
 		expected: Option<String>,
 		found: Option<String>,
 	},
+
+	TokenizationError(TokenizationError),
 }
 
 impl std::error::Error for ParsingError {}
@@ -86,7 +88,15 @@ impl std::fmt::Display for ParsingError {
 				}
 				write!(f, "{res}")
 			},
+
+			Self::TokenizationError(e) => write!(f, "{e}"),
 		}
+	}
+}
+
+impl From<TokenizationError> for ParsingError {
+	fn from(err: TokenizationError) -> Self {
+		Self::TokenizationError(err)
 	}
 }
 
