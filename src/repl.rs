@@ -21,7 +21,7 @@ impl Repl {
 		let mut line_editor = reedline::Reedline::create();
 		let prompt = Prompt::default();
 
-		println!("\nNamLang v{}", env!("CARGO_PKG_VERSION"));
+		println!("\nNumerone V{}", env!("CARGO_PKG_VERSION"));
 
 		self.is_running = true;
 		while self.is_running {
@@ -66,7 +66,7 @@ struct Prompt {}
 
 impl reedline::Prompt for Prompt {
 	fn render_prompt_left(&'_ self) -> std::borrow::Cow<'_, str> {
-		std::borrow::Cow::Borrowed(" \nnam")
+		std::borrow::Cow::Borrowed(" \nnumerone")
 	}
 
 	fn render_prompt_right(&'_ self) -> std::borrow::Cow<'_, str> {
