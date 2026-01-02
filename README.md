@@ -2,11 +2,14 @@
 
 The Number One Octave-like Programming Language Written in Rust
 
-<picture style="display: flex; justify-content: center; padding: 2em; height: 5em;">
+<br/>
+<picture style="display: flex; justify-content: center;">
     <source media="(prefers-color-scheme: dark)" srcset="assets/brainmade-white.svg">
     <source media="(prefers-color-scheme: light)" srcset="assets/brainmade-black.svg">
     <img alt="Brainmade mark." src="assets/brainmade-black.svg">
 </picture>
+<br/>
+<br/>
 
 This is NOT intented for prouduction use,
 this is just simple project for me to learn the Rust prgramming language.
