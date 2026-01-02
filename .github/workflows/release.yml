@@ -1,25 +1,32 @@
-name: Release
+name: Draft Release on Tag
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - "v*"
 
-env:
-  CARGO_TERM_COLOR: always
+permissions:
+  contents: write
 
 jobs:
-  release:
+  build:
     name: release ${{ matrix.target }}
     runs-on: ubuntu-latest
+
     strategy:
-      fail-fast: false
       matrix:
-        target: [x86_64-pc-windows-gnu, x86_64-unknown-linux-musl, x86_64-apple-darwin]
+        target: [x86_64-unknown-linux-musl]
+
     steps:
-      - uses: actions/checkout@main
-      - name: Compile and release
-        uses: rust-build/rust-build.action@v1.4.5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          RUSTTARGET: ${{ matrix.target }}
+    - uses: actions/checkout@v4
+    
+    - name: Build
+      run: |
+        rustup target add ${{ matrix.target }}
+        cargo build --profile release --target ${{ matrix.target }} --verbose
+    
+    - name: Create Draft Release
+      uses: softprops/action-gh-release@v2
+      with:
+        draft: true
+        files: target/${{ matrix.target }}/release/numerone
